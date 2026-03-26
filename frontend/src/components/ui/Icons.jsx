@@ -90,3 +90,147 @@ export function SparkIcon({ className }) {
     </BaseIcon>
   );
 }
+
+export function ChevronDownIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="m6 9 6 6 6-6" />
+    </BaseIcon>
+  );
+}
+
+export function ShieldIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M12 3 5 6v6c0 5 3.5 7.5 7 9 3.5-1.5 7-4 7-9V6z" />
+      <path d="m9.5 12 1.8 1.8L15 10" />
+    </BaseIcon>
+  );
+}
+
+export function LogOutIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <path d="M10 17 15 12 10 7" />
+      <path d="M15 12H3" />
+    </BaseIcon>
+  );
+}
+
+export function EyeIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+      <circle cx="12" cy="12" r="3" />
+    </BaseIcon>
+  );
+}
+
+export function EyeOffIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-4.4" />
+      <path d="M9.9 5.2A11.6 11.6 0 0 1 12 5c6.5 0 10 7 10 7a18.6 18.6 0 0 1-4.2 4.9" />
+      <path d="M6.2 6.3A18.7 18.7 0 0 0 2 12s3.5 7 10 7c1.2 0 2.3-.2 3.3-.6" />
+    </BaseIcon>
+  );
+}
+
+export function CloseIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </BaseIcon>
+  );
+}
+
+export function ChartBarIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M4 20V10" />
+      <path d="M10 20V4" />
+      <path d="M16 20v-7" />
+      <path d="M22 20v-12" />
+    </BaseIcon>
+  );
+}
+
+export function ClipboardListIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M9 4h6" />
+      <path d="M9 2h6v4H9z" />
+      <path d="M6 6h12v16H6z" />
+      <path d="M9 11h6" />
+      <path d="M9 15h6" />
+    </BaseIcon>
+  );
+}
+
+export function PackageIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="m12 2 9 5-9 5-9-5 9-5z" />
+      <path d="M3 7v10l9 5 9-5V7" />
+      <path d="M12 12v10" />
+    </BaseIcon>
+  );
+}
+
+export function UsersGroupIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+      <circle cx="10" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.9" />
+      <path d="M16 3.1a4 4 0 0 1 0 7.8" />
+    </BaseIcon>
+  );
+}
+
+export function DollarIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M12 2v20" />
+      <path d="M17 6.5c0-1.7-2.2-3-5-3s-5 1.3-5 3 2.2 3 5 3 5 1.3 5 3-2.2 3-5 3-5-1.3-5-3" />
+    </BaseIcon>
+  );
+}
+
+export function MegaphoneIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M3 11v2a2 2 0 0 0 2 2h2l5 4V5L7 9H5a2 2 0 0 0-2 2z" />
+      <path d="M16 9a4 4 0 0 1 0 6" />
+      <path d="M19 7a7 7 0 0 1 0 10" />
+    </BaseIcon>
+  );
+}
+
+export function CogIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9A1.7 1.7 0 0 0 10 3.2V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9c.2.6.8 1 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z" />
+    </BaseIcon>
+  );
+}
+
+export function BackIcon({ className }) {
+  return (
+    <svg
+      className={className ?? "h-3.5 w-3.5"}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.5"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path d="M15 18 9 12 15 6" />
+    </svg>
+  );
+}

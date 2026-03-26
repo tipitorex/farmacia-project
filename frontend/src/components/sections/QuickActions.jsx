@@ -5,20 +5,29 @@ const actionIcons = [StoreIcon, TruckIcon, HeadsetIcon];
 
 export default function QuickActions() {
   return (
-    <section className="grid gap-3 sm:grid-cols-3">
+    <section className="rounded-[28px] border border-sky-100 bg-white/97 p-5 shadow-2xl shadow-slate-200/60 sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-xl font-black text-slate-900">Servicios destacados</h3>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
       {quickActions.map((item, index) => {
         const Icon = actionIcons[index] || StoreIcon;
         return (
-          <article key={item.title} className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700">
-              <Icon className="h-3.5 w-3.5" />
-              Servicio
+          <article
+            key={item.title}
+            className="flex items-start gap-3 rounded-2xl border border-sky-100 bg-sky-50/40 p-4 shadow-sm transition hover:border-sky-200"
+          >
+            <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+              <Icon className="h-5 w-5" />
             </span>
-            <h3 className="text-sm font-extrabold text-emerald-900">{item.title}</h3>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600">{item.description}</p>
+            <div>
+              <h4 className="text-sm font-extrabold text-slate-900">{item.title}</h4>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">{item.description}</p>
+            </div>
           </article>
         );
       })}
+      </div>
     </section>
   );
 }
