@@ -3,7 +3,15 @@ import { useAuth } from "../../context/AuthContext";
 import { Card, CardContent } from "../ui/card";
 
 export default function AdminRoute() {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, hasPermission } = useAuth();
+
+  const hasBackofficeAccess =
+    hasPermission("usuarios.ver") ||
+    hasPermission("productos.ver") ||
+    hasPermission("inventario.ver") ||
+    hasPermission("pedidos.ver") ||
+    hasPermission("ventas.ver") ||
+    hasPermission("clientes.ver");
 
   if (loading) {
     return (
@@ -21,7 +29,7 @@ export default function AdminRoute() {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isAdmin) {
+  if (!hasBackofficeAccess) {
     return <Navigate to="/" replace />;
   }
 

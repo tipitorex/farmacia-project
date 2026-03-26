@@ -56,3 +56,40 @@ export async function createAdminUser(accessToken, payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function listRoles(accessToken) {
+  return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/roles/`, {
+    method: "GET",
+    headers: authHeaders(accessToken),
+  });
+}
+
+export async function listPermissionsCatalog(accessToken) {
+  return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/permisos/`, {
+    method: "GET",
+    headers: authHeaders(accessToken),
+  });
+}
+
+export async function createRole(accessToken, payload) {
+  return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/roles/`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateRolePermissions(accessToken, roleName, payload) {
+  return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/roles/${roleName}/`, {
+    method: "PATCH",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteRole(accessToken, roleName) {
+  return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/roles/${roleName}/`, {
+    method: "DELETE",
+    headers: authHeaders(accessToken),
+  });
+}

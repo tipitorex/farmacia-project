@@ -2,6 +2,20 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from .rbac import (
+    ROLE_ADMIN,
+    ROLE_CLIENTE,
+    PERMISOS_CATALOGO,
+    asignar_rol_usuario,
+    normalizar_nombre_rol,
+    obtener_catalogo_permisos,
+    obtener_permisos_rol,
+    obtener_roles_disponibles,
+    obtener_permisos_usuario,
+    obtener_rol_usuario,
+    puede_acceder_backoffice,
+)
+
 
 def _generate_unique_username(email):
     user_model = get_user_model()
@@ -43,25 +57,26 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
     can_access_admin = serializers.SerializerMethodField()
+    permisos = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
-        fields = ("id", "username", "first_name", "last_name", "email", "role", "can_access_admin")
+        fields = ("id", "username", "first_name", "last_name", "email", "role", "can_access_admin", "permisos")
 
     def get_role(self, obj):
-        if obj.is_superuser:
-            return "admin"
-        if obj.is_staff:
-            return "worker"
-        return "customer"
+        return obtener_rol_usuario(obj)
 
     def get_can_access_admin(self, obj):
-        return bool(obj.is_staff or obj.is_superuser)
+        return puede_acceder_backoffice(obj)
+
+    def get_permisos(self, obj):
+        return obtener_permisos_usuario(obj)
 
 
 class AdminUserSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
     can_access_admin = serializers.SerializerMethodField()
+    permisos = serializers.SerializerMethodField()
 
     class Meta:
         model = get_user_model()
@@ -73,6 +88,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "email",
             "role",
             "can_access_admin",
+            "permisos",
             "is_active",
             "is_staff",
             "is_superuser",
@@ -81,19 +97,24 @@ class AdminUserSerializer(serializers.ModelSerializer):
         )
 
     def get_role(self, obj):
-        if obj.is_superuser:
-            return "admin"
-        if obj.is_staff:
-            return "worker"
-        return "customer"
+        return obtener_rol_usuario(obj)
 
     def get_can_access_admin(self, obj):
-        return bool(obj.is_staff or obj.is_superuser)
+        return puede_acceder_backoffice(obj)
+
+    def get_permisos(self, obj):
+        return obtener_permisos_usuario(obj)
 
 
 class AdminUserUpdateSerializer(serializers.Serializer):
-    role = serializers.ChoiceField(choices=["admin", "worker", "customer"], required=False)
+    role = serializers.CharField(required=False)
     is_active = serializers.BooleanField(required=False)
+
+    def validate_role(self, value):
+        role = normalizar_nombre_rol(value)
+        if role not in set(obtener_roles_disponibles()):
+            raise serializers.ValidationError("El rol indicado no existe.")
+        return role
 
     def validate(self, attrs):
         if not attrs:
@@ -117,15 +138,7 @@ class AdminUserUpdateSerializer(serializers.Serializer):
     def update(self, instance, validated_data):
         role = validated_data.get("role")
         if role:
-            if role == "admin":
-                instance.is_superuser = True
-                instance.is_staff = True
-            elif role == "worker":
-                instance.is_superuser = False
-                instance.is_staff = True
-            else:
-                instance.is_superuser = False
-                instance.is_staff = False
+            asignar_rol_usuario(instance, role)
 
         if "is_active" in validated_data:
             instance.is_active = validated_data["is_active"]
@@ -139,8 +152,14 @@ class AdminUserCreateSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, min_length=6)
-    role = serializers.ChoiceField(choices=["admin", "worker", "customer"], default="customer")
+    role = serializers.CharField(default=ROLE_CLIENTE)
     is_active = serializers.BooleanField(default=True)
+
+    def validate_role(self, value):
+        role = normalizar_nombre_rol(value)
+        if role not in set(obtener_roles_disponibles()):
+            raise serializers.ValidationError("El rol indicado no existe.")
+        return role
 
     def validate_email(self, value):
         user_model = get_user_model()
@@ -151,7 +170,7 @@ class AdminUserCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         user_model = get_user_model()
-        role = validated_data.pop("role", "customer")
+        role = validated_data.pop("role", ROLE_CLIENTE)
         is_active = validated_data.pop("is_active", True)
 
         validated_data["username"] = _generate_unique_username(validated_data["email"])
@@ -159,15 +178,7 @@ class AdminUserCreateSerializer(serializers.Serializer):
         user = user_model.objects.create_user(**validated_data)
         user.is_active = is_active
 
-        if role == "admin":
-            user.is_superuser = True
-            user.is_staff = True
-        elif role == "worker":
-            user.is_superuser = False
-            user.is_staff = True
-        else:
-            user.is_superuser = False
-            user.is_staff = False
+        asignar_rol_usuario(user, role)
 
         user.save(update_fields=["is_active", "is_superuser", "is_staff"])
         return user
@@ -175,6 +186,43 @@ class AdminUserCreateSerializer(serializers.Serializer):
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
+
+
+class RolSerializer(serializers.Serializer):
+    nombre = serializers.CharField()
+    permisos = serializers.ListField(child=serializers.CharField(), required=False)
+
+    def to_representation(self, instance):
+        return {
+            "nombre": instance if isinstance(instance, str) else instance.name,
+            "permisos": obtener_permisos_rol(instance if isinstance(instance, str) else instance.name),
+        }
+
+
+class RolCreateUpdateSerializer(serializers.Serializer):
+    nombre = serializers.CharField(required=True)
+    permisos = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+
+    def validate_nombre(self, value):
+        return normalizar_nombre_rol(value)
+
+    def validate_permisos(self, value):
+        catalog = set(obtener_catalogo_permisos())
+        invalid = [code for code in value if code not in catalog]
+        if invalid:
+            raise serializers.ValidationError(f"Permisos invalidos: {', '.join(invalid)}")
+        return sorted(set(value))
+
+
+class PermisoCatalogoSerializer(serializers.Serializer):
+    codigo = serializers.CharField()
+    nombre = serializers.CharField()
+
+    def to_representation(self, instance):
+        return {
+            "codigo": instance,
+            "nombre": PERMISOS_CATALOGO.get(instance, instance),
+        }
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):

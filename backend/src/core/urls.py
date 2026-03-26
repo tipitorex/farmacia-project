@@ -1,6 +1,9 @@
 from django.urls import path
 
 from .views import (
+    admin_permisos_catalogo,
+    admin_role_detail,
+    admin_roles_list,
     admin_user_update,
     admin_users_list,
     health,
@@ -26,4 +29,7 @@ urlpatterns = [
     path("auth/password-reset/confirm/", password_reset_confirm, name="password-reset-confirm"),
     path("admin/users/", admin_users_list, name="admin-users-list"),
     path("admin/users/<int:user_id>/", admin_user_update, name="admin-user-update"),
+    path("admin/roles/", admin_roles_list, name="admin-roles-list"),
+    path("admin/roles/<str:role_name>/", admin_role_detail, name="admin-role-detail"),
+    path("admin/permisos/", admin_permisos_catalogo, name="admin-permisos-catalogo"),
 ]

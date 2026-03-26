@@ -14,18 +14,51 @@ import {
   UsersGroupIcon,
 } from "../ui/Icons";
 import { useOutsideClick } from "../../hooks/useOutsideClick";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AdminLayout({ activeSection, setActiveSection, currentUser, onLogout, children }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showUsersSection, setShowUsersSection] = useState(true);
   const userMenuRef = useRef(null);
+  const { hasPermission } = useAuth();
 
   useOutsideClick(userMenuRef, () => setShowUserMenu(false));
 
   const roleLabel = useMemo(() => {
     if (currentUser?.role === "admin") return "Administrador";
-    if (currentUser?.role === "worker") return "Trabajador";
-    return "Usuario";
+    if (currentUser?.role === "farmaceutico") return "Farmaceutico";
+    if (currentUser?.role === "cajero") return "Cajero";
+    return "Cliente";
   }, [currentUser]);
+
+  const visibleSections = useMemo(
+    () => adminSections.filter((section) => hasPermission(section.requiredPermission)),
+    [hasPermission]
+  );
+
+  const userManagementSectionIds = ["users", "roles-permisos"];
+
+  const userManagementSections = useMemo(
+    () => visibleSections.filter((section) => userManagementSectionIds.includes(section.id)),
+    [visibleSections]
+  );
+
+  const regularSections = useMemo(
+    () => visibleSections.filter((section) => !userManagementSectionIds.includes(section.id)),
+    [visibleSections]
+  );
+
+  const overviewSection = useMemo(
+    () => regularSections.find((section) => section.id === "overview") || null,
+    [regularSections]
+  );
+
+  const otherRegularSections = useMemo(
+    () => regularSections.filter((section) => section.id !== "overview"),
+    [regularSections]
+  );
+
+  const isUsersSectionActive = userManagementSections.some((section) => section.id === activeSection);
 
   const fullName = useMemo(() => {
     return [currentUser?.first_name, currentUser?.last_name].filter(Boolean).join(" ").trim();
@@ -71,7 +104,72 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
           </div>
 
           <nav className="space-y-1.5">
-            {adminSections.map((section) => {
+            {overviewSection ? (() => {
+              const Icon = iconMap[overviewSection.icon] || ShieldIcon;
+              const isActive = activeSection === overviewSection.id;
+
+              return (
+                <button
+                  key={overviewSection.id}
+                  type="button"
+                  onClick={() => setActiveSection(overviewSection.id)}
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    isActive
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${isActive ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="truncate">{overviewSection.label}</span>
+                </button>
+              );
+            })() : null}
+
+            {userManagementSections.length ? (
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowUsersSection((prev) => !prev)}
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    isUsersSectionActive
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${isUsersSectionActive ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>
+                    <UsersGroupIcon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 truncate">Usuarios</span>
+                  <ChevronDownIcon className={`h-4 w-4 transition ${showUsersSection ? "rotate-180" : ""}`} />
+                </button>
+
+                {showUsersSection ? (
+                  <div className="space-y-1 pl-3">
+                    {userManagementSections.map((section) => {
+                      const isActive = activeSection === section.id;
+                      return (
+                        <button
+                          key={section.id}
+                          type="button"
+                          onClick={() => setActiveSection(section.id)}
+                          className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                            isActive
+                              ? "border-teal-600 bg-teal-50 text-teal-700"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span className="truncate">{section.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {otherRegularSections.map((section) => {
               const Icon = iconMap[section.icon] || ShieldIcon;
               const isActive = activeSection === section.id;
 

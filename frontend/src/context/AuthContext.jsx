@@ -42,9 +42,19 @@ export function AuthProvider({ children }) {
   }, []);
 
   const isAdmin = canAccessAdmin(user);
+  const permissions = Array.isArray(user?.permisos) ? user.permisos : [];
+
+  const hasPermission = useCallback(
+    (permissionCode) => {
+      if (!permissionCode) return true;
+      if (isAdmin) return true;
+      return permissions.includes(permissionCode);
+    },
+    [isAdmin, permissions]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, permissions, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,14 +1,14 @@
 # Sistema de Informacion - Monorepo
 
-Base inicial para un sistema de informacion con:
+Monorepo de Farmacia con frontend web, backend API y cliente mobile.
 
-- Backend: Django + Python
-- Frontend web: React + JavaScript + Tailwind CSS
-- Mobile: Flutter
+- Backend: Django + DRF + JWT
+- Frontend: React + Vite + Tailwind
 - Base de datos: PostgreSQL
 - Contenedores: Docker + Docker Compose
+- Mobile: Flutter (separado)
 
-## Estructura
+## Estructura principal
 
 ```text
 .
@@ -17,10 +17,11 @@ Base inicial para un sistema de informacion con:
 |   |-- requirements.txt
 |   |-- entrypoint.sh
 |   `-- src/
+|       |-- manage.py
+|       `-- core/
 |-- frontend/
 |   |-- Dockerfile
 |   |-- package.json
-|   |-- tailwind.config.js
 |   `-- src/
 |-- mobile/
 |   `-- README.md
@@ -28,27 +29,38 @@ Base inicial para un sistema de informacion con:
 `-- .env.example
 ```
 
-## 1) Preparar variables
+## 1) Configuracion inicial
 
 1. Copia `.env.example` a `.env`.
-2. Ajusta valores de credenciales y puertos.
+2. Ajusta variables de base de datos, backend y frontend.
 
-## 2) Levantar backend + frontend + postgres
+## 2) Levantar el entorno con Docker
 
 ```bash
 docker compose up --build
 ```
 
-Servicios:
+## Ver logs de frontend y backend
+Logs en tiempo real de ambos servicios:
+```bash
+docker compose logs -f frontend backend
+```
+Solo logs de frontend:
+```bash
+docker compose logs -f frontend
+```
+Solo logs de backend:
+```bash
+docker compose logs -f backend
+```
+Ver las ultimas 100 lineas (sin seguir):
+```bash
+docker compose logs --tail=100 frontend backend
+```
 
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:8000`
-- Health backend: `http://localhost:8000/api/health/`
-- Postgres: `localhost:5432`
+## 3) Comandos utiles (backend)
 
-## 3) Comandos utiles
-
-Migraciones Django:
+Aplicar migraciones:
 
 ```bash
 docker compose exec backend python manage.py makemigrations
@@ -61,16 +73,21 @@ Crear superusuario:
 docker compose exec backend python manage.py createsuperuser
 ```
 
-## 4) Inicializar Flutter (mobile)
+Sembrar roles y permisos RBAC:
 
-Dentro de `mobile/` ejecuta:
+```bash
+docker compose exec backend python manage.py seed_roles_permisos
+```
+## 4) Mobile (Flutter)
+
+Dentro de `mobile/`:
 
 ```bash
 flutter create .
 flutter run
-
 ```
-superusuario:
-username: admin
-email: admin@gmail.com
-password: admin123
+
+## Notas
+
+- No guardar credenciales reales en el README.
+- Para desarrollo local, usar usuarios de prueba en `.env` o en seeds internas.

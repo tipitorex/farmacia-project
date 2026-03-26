@@ -19,12 +19,29 @@ from .serializers import (
     AdminUserCreateSerializer,
     AdminUserSerializer,
     AdminUserUpdateSerializer,
+    PermisoCatalogoSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
+    RolCreateUpdateSerializer,
+    RolSerializer,
     UserSerializer,
 )
 from .audit import log_auth_event
+from .rbac import (
+    ROLES_PROTEGIDOS,
+    ROLE_ADMIN,
+    ROLE_CLIENTE,
+    ROLE_FARMACEUTICO,
+    asignar_rol_usuario,
+    crear_rol,
+    obtener_catalogo_permisos,
+    obtener_roles_disponibles,
+    obtener_permisos_rol,
+    actualizar_permisos_rol,
+    seed_roles_y_permisos,
+    tiene_permiso,
+)
 from .security import (
     clear_failures_and_lock,
     consume_rate_limit,
@@ -38,6 +55,29 @@ class AdminUsersPagination(PageNumberPagination):
     page_size = 8
     page_size_query_param = "page_size"
     max_page_size = 50
+
+
+def ensure_rbac_seeded_and_user_role(user=None):
+    seed_roles_y_permisos()
+
+    if user is None or user.groups.exists():
+        return
+
+    if user.is_superuser:
+        asignar_rol_usuario(user, ROLE_ADMIN)
+    elif user.is_staff:
+        asignar_rol_usuario(user, ROLE_FARMACEUTICO)
+    else:
+        asignar_rol_usuario(user, ROLE_CLIENTE)
+
+    user.save(update_fields=["is_superuser", "is_staff"])
+
+
+def require_permission_response(user, permission_code, detail_message):
+    if tiene_permiso(user, permission_code) or user.is_superuser:
+        return None
+
+    return Response({"detail": detail_message}, status=status.HTTP_403_FORBIDDEN)
 
 
 def set_auth_cookies(response, access_token=None, refresh_token=None):
@@ -188,6 +228,8 @@ def login(request):
     if normalized_email:
         clear_failures_and_lock(email_scope, normalized_email)
 
+    ensure_rbac_seeded_and_user_role(user)
+
     update_last_login(None, user)
     log_auth_event(request, "login", outcome="success", user_id=user.id, email=user.email)
 
@@ -269,6 +311,7 @@ def verify_email(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
+    ensure_rbac_seeded_and_user_role(request.user)
     return Response(UserSerializer(request.user).data)
 
 
@@ -276,8 +319,13 @@ def me(request):
 @permission_classes([IsAuthenticated])
 def admin_users_list(request):
     if request.method == "GET":
-        if not (request.user.is_staff or request.user.is_superuser):
-            return Response({"detail": "No tienes permisos para ver usuarios."}, status=status.HTTP_403_FORBIDDEN)
+        permission_denied = require_permission_response(
+            request.user,
+            "usuarios.ver",
+            "No tienes permisos para ver usuarios.",
+        )
+        if permission_denied:
+            return permission_denied
 
         user_model = get_user_model()
         users = user_model.objects.all().order_by("-date_joined")
@@ -294,12 +342,13 @@ def admin_users_list(request):
                 | Q(last_name__icontains=search)
             )
 
-        if role == "admin":
-            users = users.filter(is_superuser=True)
-        elif role == "worker":
-            users = users.filter(is_staff=True, is_superuser=False)
-        elif role == "customer":
-            users = users.filter(is_staff=False, is_superuser=False)
+        if role != "all":
+            if role == "worker":
+                users = users.filter(is_staff=True, is_superuser=False)
+            elif role in {"customer"}:
+                users = users.filter(groups__name="cliente")
+            else:
+                users = users.filter(groups__name=role)
 
         if status_filter == "active":
             users = users.filter(is_active=True)
@@ -311,11 +360,13 @@ def admin_users_list(request):
         serializer = AdminUserSerializer(paged_users, many=True)
         return paginator.get_paginated_response(serializer.data)
 
-    if not request.user.is_superuser:
-        return Response(
-            {"detail": "Solo administradores pueden crear usuarios desde el panel."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    permission_denied = require_permission_response(
+        request.user,
+        "usuarios.gestionar",
+        "Solo administradores pueden crear usuarios desde el panel.",
+    )
+    if permission_denied:
+        return permission_denied
 
     serializer = AdminUserCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -326,11 +377,13 @@ def admin_users_list(request):
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def admin_user_update(request, user_id):
-    if not request.user.is_superuser:
-        return Response(
-            {"detail": "Solo administradores pueden editar roles y estado de usuarios."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    permission_denied = require_permission_response(
+        request.user,
+        "usuarios.gestionar",
+        "Solo administradores pueden editar roles y estado de usuarios.",
+    )
+    if permission_denied:
+        return permission_denied
 
     user_model = get_user_model()
     try:
@@ -348,6 +401,96 @@ def admin_user_update(request, user_id):
     updated_user = serializer.save()
 
     return Response(AdminUserSerializer(updated_user).data)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def admin_roles_list(request):
+    permission_denied = require_permission_response(
+        request.user,
+        "usuarios.gestionar",
+        "No tienes permisos para gestionar roles.",
+    )
+    if permission_denied:
+        return permission_denied
+
+    ensure_rbac_seeded_and_user_role(request.user)
+
+    if request.method == "GET":
+        roles = obtener_roles_disponibles()
+        serializer = RolSerializer(roles, many=True)
+        return Response(serializer.data)
+
+    serializer = RolCreateUpdateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    role_name = serializer.validated_data["nombre"]
+    role_permissions = serializer.validated_data.get("permisos", [])
+
+    try:
+        role_group = crear_rol(role_name, role_permissions)
+    except ValueError as ex:
+        return Response({"detail": str(ex)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(RolSerializer(role_group).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def admin_role_detail(request, role_name):
+    permission_denied = require_permission_response(
+        request.user,
+        "usuarios.gestionar",
+        "No tienes permisos para gestionar roles.",
+    )
+    if permission_denied:
+        return permission_denied
+
+    normalized_role_name = role_name.strip().lower()
+
+    from django.contrib.auth.models import Group
+
+    role_group = Group.objects.filter(name=normalized_role_name).first()
+    if not role_group:
+        return Response({"detail": "Rol no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        if role_group.name in ROLES_PROTEGIDOS:
+            return Response({"detail": "No se puede eliminar un rol protegido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if role_group.user_set.exists():
+            return Response(
+                {"detail": "No se puede eliminar el rol porque tiene usuarios asignados."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        role_group.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    serializer = RolCreateUpdateSerializer(data={"nombre": role_group.name, "permisos": request.data.get("permisos", [])})
+    serializer.is_valid(raise_exception=True)
+
+    role_permissions = serializer.validated_data.get("permisos", [])
+    try:
+        actualizar_permisos_rol(role_group, role_permissions)
+    except ValueError as ex:
+        return Response({"detail": str(ex)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({"nombre": role_group.name, "permisos": obtener_permisos_rol(role_group.name)})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_permisos_catalogo(request):
+    permission_denied = require_permission_response(
+        request.user,
+        "usuarios.gestionar",
+        "No tienes permisos para ver el catalogo de permisos.",
+    )
+    if permission_denied:
+        return permission_denied
+
+    serializer = PermisoCatalogoSerializer(obtener_catalogo_permisos(), many=True)
+    return Response(serializer.data)
 
 
 @api_view(["POST"])

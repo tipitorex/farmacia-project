@@ -8,7 +8,16 @@ import { Input } from "../components/ui/input";
 import { CloseIcon } from "../components/ui/Icons";
 import { adminProducts, dashboardKpis, recentOrders } from "../data/adminData";
 import { useAuth } from "../context/AuthContext";
-import { createAdminUser, listAdminUsers, updateAdminUser } from "../services/adminService";
+import {
+  createAdminUser,
+  createRole,
+  deleteRole,
+  listAdminUsers,
+  listPermissionsCatalog,
+  listRoles,
+  updateAdminUser,
+  updateRolePermissions,
+} from "../services/adminService";
 
 const USERS_PAGE_SIZE = 8;
 
@@ -27,7 +36,7 @@ function StatusBadge({ status }) {
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, hasPermission } = useAuth();
   const [activeSection, setActiveSection] = useState("overview");
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState([]);
@@ -46,9 +55,18 @@ export default function AdminDashboardPage() {
     last_name: "",
     email: "",
     password: "",
-    role: "customer",
+    role: "cliente",
     is_active: true,
   });
+  const [roles, setRoles] = useState([]);
+  const [permisosCatalogo, setPermisosCatalogo] = useState([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState("");
+  const [newRoleName, setNewRoleName] = useState("");
+  const [selectedRoleName, setSelectedRoleName] = useState("");
+  const [selectedRolePermisos, setSelectedRolePermisos] = useState([]);
+  const [savingRole, setSavingRole] = useState(false);
+  const [deletingRoleName, setDeletingRoleName] = useState("");
 
 
 
@@ -71,6 +89,17 @@ export default function AdminDashboardPage() {
   const hasUsersFilters = useMemo(() => {
     return Boolean(usersSearch.trim()) || usersRoleFilter !== "all" || usersStatusFilter !== "all";
   }, [usersSearch, usersRoleFilter, usersStatusFilter]);
+
+  const canViewUsers = hasPermission("usuarios.ver");
+  const canManageUsers = hasPermission("usuarios.gestionar");
+
+  const roleOptions = useMemo(() => {
+    return roles.map((item) => item.nombre);
+  }, [roles]);
+
+  const effectiveRoleOptions = roleOptions.length ? roleOptions : ["cliente", "cajero", "farmaceutico", "admin"];
+
+  const canManageRoles = canManageUsers;
 
   const paginationRangeText = useMemo(() => {
     if (!usersTotalCount) return "Mostrando 0 de 0 usuarios";
@@ -109,11 +138,121 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const loadRolesAndPermissions = async () => {
+    if (!canManageRoles) return;
+
+    setRolesLoading(true);
+    setRolesError("");
+
+    try {
+      const [rolesData, permissionsData] = await Promise.all([
+        listRoles(undefined),
+        listPermissionsCatalog(undefined),
+      ]);
+
+      const normalizedRoles = Array.isArray(rolesData) ? rolesData : [];
+      const normalizedPermissions = Array.isArray(permissionsData) ? permissionsData : [];
+
+      setRoles(normalizedRoles);
+      setPermisosCatalogo(normalizedPermissions);
+
+      const firstRole = normalizedRoles[0]?.nombre || "";
+      setSelectedRoleName((prev) => prev || firstRole);
+      if (!selectedRoleName && firstRole) {
+        const firstRolePerms = normalizedRoles.find((item) => item.nombre === firstRole)?.permisos || [];
+        setSelectedRolePermisos(firstRolePerms);
+      }
+    } catch (errorData) {
+      setRolesError(errorData?.detail || "No se pudieron cargar roles y permisos.");
+    } finally {
+      setRolesLoading(false);
+    }
+  };
+
+  const handleCreateRole = async (event) => {
+    event.preventDefault();
+    if (!newRoleName.trim()) return;
+
+    setSavingRole(true);
+    setRolesError("");
+    try {
+      const created = await createRole(undefined, {
+        nombre: newRoleName.trim().toLowerCase(),
+        permisos: [],
+      });
+      setRoles((prev) => [...prev, created].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setNewRoleName("");
+      setSelectedRoleName(created.nombre);
+      setSelectedRolePermisos(created.permisos || []);
+    } catch (errorData) {
+      setRolesError(errorData?.detail || "No se pudo crear el rol.");
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  const handleSaveRolePermissions = async () => {
+    if (!selectedRoleName) return;
+
+    setSavingRole(true);
+    setRolesError("");
+    try {
+      const updated = await updateRolePermissions(undefined, selectedRoleName, {
+        permisos: selectedRolePermisos,
+      });
+      setRoles((prev) =>
+        prev.map((item) => (item.nombre === updated.nombre ? updated : item)).sort((a, b) => a.nombre.localeCompare(b.nombre))
+      );
+    } catch (errorData) {
+      setRolesError(errorData?.detail || "No se pudieron actualizar permisos del rol.");
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  const handleDeleteRole = async (roleName) => {
+    if (!roleName) return;
+    setDeletingRoleName(roleName);
+    setRolesError("");
+    try {
+      await deleteRole(undefined, roleName);
+      const nextRoles = roles.filter((item) => item.nombre !== roleName);
+      setRoles(nextRoles);
+      if (selectedRoleName === roleName) {
+        const fallback = nextRoles[0]?.nombre || "";
+        setSelectedRoleName(fallback);
+        setSelectedRolePermisos(nextRoles.find((item) => item.nombre === fallback)?.permisos || []);
+      }
+    } catch (errorData) {
+      setRolesError(errorData?.detail || "No se pudo eliminar el rol.");
+    } finally {
+      setDeletingRoleName("");
+    }
+  };
+
   useEffect(() => {
-    if (activeSection === "users" && isAdmin) {
+    if (activeSection === "users" && canViewUsers) {
       loadUsers(usersPage);
     }
-  }, [activeSection, usersPage, usersSearch, usersRoleFilter, usersStatusFilter, isAdmin]);
+  }, [activeSection, usersPage, usersSearch, usersRoleFilter, usersStatusFilter, canViewUsers]);
+
+  useEffect(() => {
+    if ((activeSection === "users" || activeSection === "roles-permisos") && canManageRoles) {
+      loadRolesAndPermissions();
+    }
+  }, [activeSection, canManageRoles]);
+
+  useEffect(() => {
+    if (!selectedRoleName) return;
+    const selected = roles.find((item) => item.nombre === selectedRoleName);
+    setSelectedRolePermisos(selected?.permisos || []);
+  }, [selectedRoleName, roles]);
+
+  useEffect(() => {
+    if (!effectiveRoleOptions.includes(createUserForm.role)) {
+      setCreateUserForm((prev) => ({ ...prev, role: effectiveRoleOptions[0] }));
+    }
+  }, [effectiveRoleOptions, createUserForm.role]);
 
   const handleUserRoleChange = async (targetUser, nextRole) => {
     setSavingUserId(targetUser.id);
@@ -154,7 +293,7 @@ export default function AdminDashboardPage() {
         last_name: "",
         email: "",
         password: "",
-        role: "customer",
+        role: "cliente",
         is_active: true,
       });
       setUsersPage(1);
@@ -293,7 +432,7 @@ export default function AdminDashboardPage() {
                   Limpiar filtros
                 </Button>
               ) : null}
-              {user?.role === "admin" ? (
+              {canManageUsers ? (
                 <Button
                   size="sm"
                   onClick={() => setShowCreateUserModal(true)}
@@ -328,9 +467,9 @@ export default function AdminDashboardPage() {
               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
             >
               <option value="all">Todos los roles</option>
-              <option value="admin">Administrador</option>
-              <option value="worker">Trabajador</option>
-              <option value="customer">Cliente</option>
+              {effectiveRoleOptions.map((roleName) => (
+                <option key={roleName} value={roleName}>{roleName}</option>
+              ))}
             </select>
             <select
               value={usersStatusFilter}
@@ -367,7 +506,7 @@ export default function AdminDashboardPage() {
                 <tbody>
                   {users.map((item) => {
                     const isSaving = savingUserId === item.id;
-                    const isReadOnly = user?.role !== "admin";
+                    const isReadOnly = !canManageUsers;
 
                     return (
                       <tr key={item.id} className="border-b border-slate-100 last:border-b-0">
@@ -383,9 +522,9 @@ export default function AdminDashboardPage() {
                             aria-label={`Rol de usuario ${item.email || item.id}`}
                             className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-sky-300 disabled:bg-slate-100"
                           >
-                            <option value="customer">Cliente</option>
-                            <option value="worker">Trabajador</option>
-                            <option value="admin">Administrador</option>
+                            {effectiveRoleOptions.map((roleName) => (
+                              <option key={roleName} value={roleName}>{roleName}</option>
+                            ))}
                           </select>
                         </td>
                         <td className="py-3 pr-4">
@@ -509,9 +648,9 @@ export default function AdminDashboardPage() {
                         aria-label="Rol del nuevo usuario"
                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
                       >
-                        <option value="customer">Cliente</option>
-                        <option value="worker">Trabajador</option>
-                        <option value="admin">Administrador</option>
+                        {effectiveRoleOptions.map((roleName) => (
+                          <option key={roleName} value={roleName}>{roleName}</option>
+                        ))}
                       </select>
                       <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
                         <input
@@ -535,10 +674,141 @@ export default function AdminDashboardPage() {
       ) : null}
 
       {activeSection !== "overview" && activeSection !== "products" && activeSection !== "users" ? (
+        activeSection === "roles-permisos" ? (
+          <section className="space-y-4">
+            <section className="rounded-[28px] border border-slate-200 bg-white/97 p-4 shadow-md sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Configuracion de roles y permisos</h3>
+                  <p className="text-sm text-slate-500">Administra los roles disponibles y sus permisos operativos.</p>
+                </div>
+                <Button variant="secondary" size="sm" onClick={loadRolesAndPermissions} disabled={rolesLoading || !canManageRoles}>
+                  {rolesLoading ? "Actualizando..." : "Actualizar"}
+                </Button>
+              </div>
+
+              {!canManageRoles ? (
+                <Alert tone="danger" className="mb-3">
+                  <AlertDescription>No tienes permisos para gestionar roles.</AlertDescription>
+                </Alert>
+              ) : null}
+
+              {rolesError ? (
+                <Alert tone="danger" className="mb-3">
+                  <AlertDescription>{rolesError}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={handleCreateRole}>
+                <Input
+                  type="text"
+                  value={newRoleName}
+                  onChange={(event) => setNewRoleName(event.target.value)}
+                  placeholder="Nombre del nuevo rol (ej: supervisor)"
+                  aria-label="Nombre del nuevo rol"
+                  disabled={!canManageRoles || savingRole}
+                />
+                <Button type="submit" disabled={!canManageRoles || savingRole || !newRoleName.trim()} className="bg-teal-700 hover:bg-teal-600">
+                  Crear rol
+                </Button>
+              </form>
+
+              <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Roles</p>
+                  <div className="space-y-2">
+                    {roles.map((roleItem) => {
+                      const isActiveRole = roleItem.nombre === selectedRoleName;
+                      const isDeleting = deletingRoleName === roleItem.nombre;
+                      const canDeleteRole = roleItem.nombre !== "admin";
+
+                      return (
+                        <div key={roleItem.nombre} className={`flex items-center gap-2 rounded-xl border px-2 py-2 ${isActiveRole ? "border-teal-600 bg-teal-50" : "border-slate-200 bg-white"}`}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRoleName(roleItem.nombre)}
+                            className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-slate-800"
+                          >
+                            {roleItem.nombre}
+                          </button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleDeleteRole(roleItem.nombre)}
+                            disabled={!canManageRoles || !canDeleteRole || isDeleting}
+                          >
+                            {isDeleting ? "..." : "Eliminar"}
+                          </Button>
+                        </div>
+                      );
+                    })}
+
+                    {!roles.length ? (
+                      <p className="text-xs text-slate-500">No hay roles disponibles.</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Permisos</p>
+                      <h4 className="text-sm font-black text-slate-900">
+                        {selectedRoleName ? `Rol: ${selectedRoleName}` : "Selecciona un rol"}
+                      </h4>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveRolePermissions}
+                      disabled={!canManageRoles || !selectedRoleName || savingRole}
+                      className="bg-teal-700 hover:bg-teal-600"
+                    >
+                      {savingRole ? "Guardando..." : "Guardar permisos"}
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {permisosCatalogo.map((permiso) => {
+                      const checked = selectedRolePermisos.includes(permiso.codigo);
+                      return (
+                        <label
+                          key={permiso.codigo}
+                          className="inline-flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!canManageRoles || !selectedRoleName || savingRole}
+                            onChange={(event) => {
+                              const isChecked = event.target.checked;
+                              setSelectedRolePermisos((prev) => {
+                                if (isChecked) return [...new Set([...prev, permiso.codigo])].sort();
+                                return prev.filter((code) => code !== permiso.codigo);
+                              });
+                            }}
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+                          />
+                          <span>
+                            <span className="block font-semibold text-slate-800">{permiso.nombre}</span>
+                            <span className="block text-xs text-slate-500">{permiso.codigo}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                    {!permisosCatalogo.length ? (
+                      <p className="text-sm text-slate-500">No se encontraron permisos en el catalogo.</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </section>
+        ) : (
         <section className="rounded-[28px] border border-dashed border-slate-300 bg-white/60 p-8 text-center">
           <h3 className="text-lg font-bold text-slate-700">Modulo en preparacion</h3>
           <p className="mt-2 text-sm text-slate-500">Esta seccion se implementara en la siguiente fase del panel administrativo.</p>
         </section>
+        )
       ) : null}
     </AdminLayout>
   );
