@@ -57,6 +57,13 @@ export async function createAdminUser(accessToken, payload) {
   });
 }
 
+export async function deleteAdminUser(accessToken, userId) {
+  return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/users/${userId}/`, {
+    method: "DELETE",
+    headers: authHeaders(accessToken),
+  });
+}
+
 export async function listRoles(accessToken) {
   return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/roles/`, {
     method: "GET",

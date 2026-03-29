@@ -10,6 +10,7 @@ import { adminProducts, dashboardKpis, recentOrders } from "../data/adminData";
 import { useAuth } from "../context/AuthContext";
 import {
   createAdminUser,
+  deleteAdminUser,
   createRole,
   deleteRole,
   listAdminUsers,
@@ -47,10 +48,22 @@ export default function AdminDashboardPage() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState("");
   const [usersPage, setUsersPage] = useState(1);
-  const [savingUserId, setSavingUserId] = useState(null);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [updatingUser, setUpdatingUser] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [createUserForm, setCreateUserForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    password: "",
+    role: "cliente",
+    is_active: true,
+  });
+  const [editUserForm, setEditUserForm] = useState({
     first_name: "",
     last_name: "",
     email: "",
@@ -254,31 +267,11 @@ export default function AdminDashboardPage() {
     }
   }, [effectiveRoleOptions, createUserForm.role]);
 
-  const handleUserRoleChange = async (targetUser, nextRole) => {
-    setSavingUserId(targetUser.id);
-    setUsersError("");
-    try {
-      const updated = await updateAdminUser(undefined, targetUser.id, { role: nextRole });
-      setUsers((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    } catch (errorData) {
-      setUsersError(errorData?.detail || "No se pudo actualizar el rol del usuario.");
-    } finally {
-      setSavingUserId(null);
+  useEffect(() => {
+    if (!effectiveRoleOptions.includes(editUserForm.role)) {
+      setEditUserForm((prev) => ({ ...prev, role: effectiveRoleOptions[0] }));
     }
-  };
-
-  const handleUserStatusChange = async (targetUser, nextActive) => {
-    setSavingUserId(targetUser.id);
-    setUsersError("");
-    try {
-      const updated = await updateAdminUser(undefined, targetUser.id, { is_active: nextActive });
-      setUsers((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    } catch (errorData) {
-      setUsersError(errorData?.detail || "No se pudo actualizar el estado del usuario.");
-    } finally {
-      setSavingUserId(null);
-    }
-  };
+  }, [effectiveRoleOptions, editUserForm.role]);
 
   const handleCreateUser = async (event) => {
     event.preventDefault();
@@ -308,6 +301,108 @@ export default function AdminDashboardPage() {
       }
     } finally {
       setCreatingUser(false);
+    }
+  };
+
+  const handleOpenEditUserModal = (targetUser) => {
+    setSelectedUser(targetUser);
+    setEditUserForm({
+      first_name: targetUser.first_name || "",
+      last_name: targetUser.last_name || "",
+      email: targetUser.email || "",
+      password: "",
+      role: targetUser.role || "cliente",
+      is_active: Boolean(targetUser.is_active),
+    });
+    setShowEditUserModal(true);
+  };
+
+  const handleCloseEditUserModal = () => {
+    setShowEditUserModal(false);
+    setSelectedUser(null);
+    setEditUserForm({
+      first_name: "",
+      last_name: "",
+      email: "",
+      password: "",
+      role: "cliente",
+      is_active: true,
+    });
+  };
+
+  const handleSubmitEditUser = async (event) => {
+    event.preventDefault();
+    if (!selectedUser?.id) return;
+
+    setUpdatingUser(true);
+    setUsersError("");
+
+    const payload = {
+      first_name: editUserForm.first_name,
+      last_name: editUserForm.last_name,
+      email: editUserForm.email,
+      role: editUserForm.role,
+      is_active: editUserForm.is_active,
+    };
+
+    if (editUserForm.password.trim()) {
+      payload.password = editUserForm.password;
+    }
+
+    try {
+      const updated = await updateAdminUser(undefined, selectedUser.id, payload);
+      setUsers((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      handleCloseEditUserModal();
+    } catch (errorData) {
+      if (typeof errorData === "object" && errorData !== null) {
+        const firstKey = Object.keys(errorData)[0];
+        const firstMessage = Array.isArray(errorData[firstKey]) ? errorData[firstKey][0] : errorData[firstKey];
+        setUsersError(firstMessage || "No se pudo actualizar el usuario.");
+      } else {
+        setUsersError("No se pudo actualizar el usuario.");
+      }
+    } finally {
+      setUpdatingUser(false);
+    }
+  };
+
+  const handleOpenDeleteUserModal = (targetUser) => {
+    setSelectedUser(targetUser);
+    setShowDeleteUserModal(true);
+  };
+
+  const handleCloseDeleteUserModal = () => {
+    setShowDeleteUserModal(false);
+    setSelectedUser(null);
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    if (!selectedUser?.id) return;
+
+    setDeletingUser(true);
+    setUsersError("");
+
+    try {
+      await deleteAdminUser(undefined, selectedUser.id);
+      setShowDeleteUserModal(false);
+      setSelectedUser(null);
+
+      const nextCount = Math.max(0, usersTotalCount - 1);
+      const nextTotalPages = Math.max(1, Math.ceil(nextCount / USERS_PAGE_SIZE));
+      const nextPage = Math.min(usersPage, nextTotalPages);
+      setUsersTotalCount(nextCount);
+      setUsersPage(nextPage);
+      await loadUsers(nextPage);
+    } catch (errorData) {
+      if (typeof errorData === "object" && errorData !== null) {
+        const firstKey = Object.keys(errorData)[0];
+        const firstMessage = Array.isArray(errorData[firstKey]) ? errorData[firstKey][0] : errorData[firstKey];
+        setUsersError(firstMessage || "No se pudo eliminar el usuario.");
+      } else {
+        setUsersError("No se pudo eliminar el usuario.");
+      }
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -500,12 +595,12 @@ export default function AdminDashboardPage() {
                     <th scope="col" className="py-2 pr-4">Correo</th>
                     <th scope="col" className="py-2 pr-4">Rol</th>
                     <th scope="col" className="py-2 pr-4">Estado</th>
-                    <th scope="col" className="py-2">Ultimo acceso</th>
+                    <th scope="col" className="py-2 pr-4">Ultimo acceso</th>
+                    <th scope="col" className="py-2">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((item) => {
-                    const isSaving = savingUserId === item.id;
                     const isReadOnly = !canManageUsers;
 
                     return (
@@ -515,39 +610,46 @@ export default function AdminDashboardPage() {
                         </td>
                         <td className="py-3 pr-4 text-slate-700">{item.email || "(sin correo)"}</td>
                         <td className="py-3 pr-4">
-                          <select
-                            value={item.role}
-                            disabled={isReadOnly || isSaving}
-                            onChange={(event) => handleUserRoleChange(item, event.target.value)}
-                            aria-label={`Rol de usuario ${item.email || item.id}`}
-                            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-sky-300 disabled:bg-slate-100"
-                          >
-                            {effectiveRoleOptions.map((roleName) => (
-                              <option key={roleName} value={roleName}>{roleName}</option>
-                            ))}
-                          </select>
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                            {item.role}
+                          </span>
                         </td>
                         <td className="py-3 pr-4">
-                          <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(item.is_active)}
-                              disabled={isReadOnly || isSaving}
-                              onChange={(event) => handleUserStatusChange(item, event.target.checked)}
-                              className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500 disabled:cursor-not-allowed"
-                            />
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.is_active ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
+                          >
                             {item.is_active ? "Activo" : "Inactivo"}
-                          </label>
+                          </span>
                         </td>
-                        <td className="py-3 text-slate-600">
+                        <td className="py-3 pr-4 text-slate-600">
                           {item.last_login ? new Date(item.last_login).toLocaleString() : "Sin acceso"}
+                        </td>
+                        <td className="py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleOpenEditUserModal(item)}
+                              disabled={isReadOnly}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenDeleteUserModal(item)}
+                              disabled={isReadOnly}
+                              className="bg-rose-600 text-white hover:bg-rose-500"
+                            >
+                              Eliminar
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                   {!users.length ? (
                     <tr>
-                      <td colSpan={5} className="py-4 text-center text-sm text-slate-500">
+                      <td colSpan={6} className="py-4 text-center text-sm text-slate-500">
                         {hasUsersFilters
                           ? "No hay usuarios para los filtros actuales. Usa 'Limpiar filtros'."
                           : "No hay usuarios para mostrar."}
@@ -666,6 +768,121 @@ export default function AdminDashboardPage() {
                       {creatingUser ? "Creando usuario..." : "Crear usuario"}
                     </Button>
                   </form>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {showEditUserModal ? (
+            <div
+              className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Editar usuario"
+            >
+              <Card className="w-full max-w-lg overflow-hidden">
+                <CardHeader className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(236,253,245,0.92),rgba(240,249,255,0.92))]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">Backoffice</p>
+                      <CardTitle>Editar usuario</CardTitle>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCloseEditUserModal}
+                      aria-label="Cerrar"
+                      className="rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-500 transition hover:border-slate-300 hover:bg-white hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
+                    >
+                      <CloseIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-5">
+                  <form className="space-y-3" onSubmit={handleSubmitEditUser}>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Input
+                        type="text"
+                        placeholder="Nombre"
+                        value={editUserForm.first_name}
+                        onChange={(event) => setEditUserForm((prev) => ({ ...prev, first_name: event.target.value }))}
+                      />
+                      <Input
+                        type="text"
+                        placeholder="Apellido"
+                        value={editUserForm.last_name}
+                        onChange={(event) => setEditUserForm((prev) => ({ ...prev, last_name: event.target.value }))}
+                      />
+                    </div>
+                    <Input
+                      type="email"
+                      placeholder="Correo electronico"
+                      value={editUserForm.email}
+                      onChange={(event) => setEditUserForm((prev) => ({ ...prev, email: event.target.value }))}
+                      required
+                    />
+                    <Input
+                      type="password"
+                      placeholder="Nueva contrasena (opcional)"
+                      value={editUserForm.password}
+                      onChange={(event) => setEditUserForm((prev) => ({ ...prev, password: event.target.value }))}
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <select
+                        value={editUserForm.role}
+                        onChange={(event) => setEditUserForm((prev) => ({ ...prev, role: event.target.value }))}
+                        aria-label="Rol del usuario"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100"
+                      >
+                        {effectiveRoleOptions.map((roleName) => (
+                          <option key={roleName} value={roleName}>{roleName}</option>
+                        ))}
+                      </select>
+                      <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={editUserForm.is_active}
+                          onChange={(event) => setEditUserForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                          className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500"
+                        />
+                        Activo
+                      </label>
+                    </div>
+                    <Button type="submit" disabled={updatingUser} className="w-full bg-teal-700 hover:bg-teal-600">
+                      {updatingUser ? "Guardando cambios..." : "Guardar cambios"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+
+          {showDeleteUserModal ? (
+            <div
+              className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Eliminar usuario"
+            >
+              <Card className="w-full max-w-md overflow-hidden">
+                <CardHeader className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(255,241,242,0.92),rgba(255,255,255,0.92))]">
+                  <CardTitle>Confirmar eliminacion</CardTitle>
+                  <CardDescription>
+                    Se desactivara la cuenta de {selectedUser?.email || "este usuario"}. Esta accion se puede revertir editando su estado.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-5">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="secondary" onClick={handleCloseDeleteUserModal} disabled={deletingUser}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleConfirmDeleteUser}
+                      disabled={deletingUser}
+                      className="bg-rose-600 text-white hover:bg-rose-500"
+                    >
+                      {deletingUser ? "Eliminando..." : "Eliminar usuario"}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </div>

@@ -78,6 +78,28 @@ Sembrar roles y permisos RBAC:
 ```bash
 docker compose exec backend python manage.py seed_roles_permisos
 ```
+
+Sembrar 5 usuarios demo para pruebas de gestion de usuarios:
+
+```bash
+docker compose exec backend python manage.py seed_usuarios_demo
+```
+
+Opcional: redefinir contrasena para todos los usuarios demo existentes:
+
+```bash
+docker compose exec backend python manage.py seed_usuarios_demo --reset-password --password "MiClaveSegura123*"
+```
+
+Usuarios creados por defecto:
+
+- carlos.mendoza@saludplus.com (admin)
+- ana.rojas@saludplus.com (farmaceutico)
+- luis.torrez@saludplus.com (cajero)
+- maria.quispe@saludplus.com (cliente)
+- jorge.vargas@saludplus.com (cliente)
+
+Contrasena por defecto: `SaludPlus2026*`
 ## 4) Mobile (Flutter)
 
 Dentro de `mobile/`:

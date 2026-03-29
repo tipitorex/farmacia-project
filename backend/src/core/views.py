@@ -36,6 +36,7 @@ from .rbac import (
     asignar_rol_usuario,
     crear_rol,
     obtener_catalogo_permisos,
+    obtener_rol_usuario,
     obtener_roles_disponibles,
     obtener_permisos_rol,
     actualizar_permisos_rol,
@@ -78,6 +79,16 @@ def require_permission_response(user, permission_code, detail_message):
         return None
 
     return Response({"detail": detail_message}, status=status.HTTP_403_FORBIDDEN)
+
+
+def count_active_admin_users():
+    user_model = get_user_model()
+    return (
+        user_model.objects.filter(is_active=True)
+        .filter(Q(is_superuser=True) | Q(groups__name=ROLE_ADMIN))
+        .distinct()
+        .count()
+    )
 
 
 def set_auth_cookies(response, access_token=None, refresh_token=None):
@@ -374,7 +385,7 @@ def admin_users_list(request):
     return Response(AdminUserSerializer(created_user).data, status=status.HTTP_201_CREATED)
 
 
-@api_view(["PATCH"])
+@api_view(["PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
 def admin_user_update(request, user_id):
     permission_denied = require_permission_response(
@@ -390,6 +401,22 @@ def admin_user_update(request, user_id):
         target_user = user_model.objects.get(id=user_id)
     except user_model.DoesNotExist:
         return Response({"detail": "Usuario no encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        if request.user.id == target_user.id:
+            return Response({"detail": "No puedes eliminar tu propia cuenta."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if obtener_rol_usuario(target_user) == ROLE_ADMIN and target_user.is_active and count_active_admin_users() <= 1:
+            return Response(
+                {"detail": "No puedes eliminar el ultimo administrador activo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if target_user.is_active:
+            target_user.is_active = False
+            target_user.save(update_fields=["is_active"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     serializer = AdminUserUpdateSerializer(
         target_user,

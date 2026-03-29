@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.db.models import Q
 from rest_framework import serializers
 
 from .rbac import (
@@ -107,8 +108,29 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
 
 class AdminUserUpdateSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False)
     role = serializers.CharField(required=False)
     is_active = serializers.BooleanField(required=False)
+    password = serializers.CharField(write_only=True, min_length=6, required=False)
+
+    def _count_active_admins(self):
+        user_model = get_user_model()
+        return (
+            user_model.objects.filter(is_active=True)
+            .filter(Q(is_superuser=True) | Q(groups__name=ROLE_ADMIN))
+            .distinct()
+            .count()
+        )
+
+    def validate_email(self, value):
+        user_model = get_user_model()
+        normalized = value.strip().lower()
+        exists = user_model.objects.filter(email__iexact=normalized).exclude(id=self.instance.id).exists()
+        if exists:
+            raise serializers.ValidationError("Este correo ya esta registrado.")
+        return normalized
 
     def validate_role(self, value):
         role = normalizar_nombre_rol(value)
@@ -122,28 +144,65 @@ class AdminUserUpdateSerializer(serializers.Serializer):
 
         request_user = self.context.get("request_user")
         target_user = self.instance
+        current_role = obtener_rol_usuario(target_user)
+        next_role = attrs.get("role", current_role)
+        next_active = attrs.get("is_active", target_user.is_active)
+
+        if "password" in attrs:
+            validate_password(attrs["password"])
+
+        if current_role == ROLE_ADMIN and target_user.is_active and (not next_active or next_role != ROLE_ADMIN):
+            if self._count_active_admins() <= 1:
+                raise serializers.ValidationError("No puedes quitar o desactivar el ultimo administrador activo.")
 
         if request_user and target_user and request_user.id == target_user.id:
-            next_role = attrs.get("role")
-            next_active = attrs.get("is_active")
+            requested_role = attrs.get("role")
+            requested_active = attrs.get("is_active")
 
-            if next_active is False:
+            if requested_active is False:
                 raise serializers.ValidationError("No puedes desactivar tu propia cuenta.")
 
-            if next_role and next_role != "admin":
+            if requested_role and requested_role != ROLE_ADMIN:
                 raise serializers.ValidationError("No puedes quitarte el rol de administrador a ti mismo.")
 
         return attrs
 
     def update(self, instance, validated_data):
+        update_fields = []
+
+        if "first_name" in validated_data:
+            instance.first_name = validated_data["first_name"]
+            update_fields.append("first_name")
+
+        if "last_name" in validated_data:
+            instance.last_name = validated_data["last_name"]
+            update_fields.append("last_name")
+
+        if "email" in validated_data:
+            instance.email = validated_data["email"]
+            update_fields.append("email")
+
         role = validated_data.get("role")
         if role:
             asignar_rol_usuario(instance, role)
+            update_fields.extend(["is_superuser", "is_staff"])
 
         if "is_active" in validated_data:
             instance.is_active = validated_data["is_active"]
+            update_fields.append("is_active")
 
-        instance.save(update_fields=["is_superuser", "is_staff", "is_active"])
+        if "password" in validated_data:
+            instance.set_password(validated_data["password"])
+            update_fields.append("password")
+
+        if "email" in validated_data and not instance.username:
+            instance.username = _generate_unique_username(validated_data["email"])
+            update_fields.append("username")
+
+        if update_fields:
+            # Preserve deterministic update fields and avoid duplicates.
+            unique_update_fields = list(dict.fromkeys(update_fields))
+            instance.save(update_fields=unique_update_fields)
         return instance
 
 
