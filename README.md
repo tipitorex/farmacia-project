@@ -108,8 +108,12 @@ Dentro de `mobile/`:
 flutter create .
 flutter run
 ```
+comando para crear apps con docker:
+
+docker compose exec backend python src/manage.py startapp inventario
 
 ## Notas
 
 - No guardar credenciales reales en el README.
 - Para desarrollo local, usar usuarios de prueba en `.env` o en seeds internas.
+

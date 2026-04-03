@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { adminSections } from "../../data/adminData";
 import {
   ChartBarIcon,
@@ -21,6 +22,8 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
   const [showUsersSection, setShowUsersSection] = useState(true);
   const userMenuRef = useRef(null);
   const { hasPermission } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useOutsideClick(userMenuRef, () => setShowUserMenu(false));
 
@@ -37,6 +40,23 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
   );
 
   const userManagementSectionIds = ["users", "roles-permisos"];
+
+  const activeSectionByPath = useMemo(() => {
+    return adminSections.find((section) => section.path === location.pathname)?.id || null;
+  }, [location.pathname]);
+
+  const resolvedActiveSection = activeSection || activeSectionByPath || "overview";
+
+  const handleSectionAction = (section) => {
+    if (section.path) {
+      navigate(section.path);
+      return;
+    }
+
+    if (setActiveSection) {
+      setActiveSection(section.id);
+    }
+  };
 
   const userManagementSections = useMemo(
     () => visibleSections.filter((section) => userManagementSectionIds.includes(section.id)),
@@ -58,7 +78,7 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
     [regularSections]
   );
 
-  const isUsersSectionActive = userManagementSections.some((section) => section.id === activeSection);
+  const isUsersSectionActive = userManagementSections.some((section) => section.id === resolvedActiveSection);
 
   const fullName = useMemo(() => {
     return [currentUser?.first_name, currentUser?.last_name].filter(Boolean).join(" ").trim();
@@ -106,13 +126,13 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
           <nav className="space-y-1.5">
             {overviewSection ? (() => {
               const Icon = iconMap[overviewSection.icon] || ShieldIcon;
-              const isActive = activeSection === overviewSection.id;
+              const isActive = resolvedActiveSection === overviewSection.id;
 
               return (
                 <button
                   key={overviewSection.id}
                   type="button"
-                  onClick={() => setActiveSection(overviewSection.id)}
+                  onClick={() => handleSectionAction(overviewSection)}
                   className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
                     isActive
                       ? "border-teal-600 bg-teal-600 text-white"
@@ -148,12 +168,12 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
                 {showUsersSection ? (
                   <div className="space-y-1 pl-3">
                     {userManagementSections.map((section) => {
-                      const isActive = activeSection === section.id;
+                      const isActive = resolvedActiveSection === section.id;
                       return (
                         <button
                           key={section.id}
                           type="button"
-                          onClick={() => setActiveSection(section.id)}
+                          onClick={() => handleSectionAction(section)}
                           className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
                             isActive
                               ? "border-teal-600 bg-teal-50 text-teal-700"
@@ -171,13 +191,13 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
 
             {otherRegularSections.map((section) => {
               const Icon = iconMap[section.icon] || ShieldIcon;
-              const isActive = activeSection === section.id;
+              const isActive = resolvedActiveSection === section.id;
 
               return (
                 <button
                   key={section.id}
                   type="button"
-                  onClick={() => setActiveSection(section.id)}
+                  onClick={() => handleSectionAction(section)}
                   className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
                     isActive
                       ? "border-teal-600 bg-teal-600 text-white"

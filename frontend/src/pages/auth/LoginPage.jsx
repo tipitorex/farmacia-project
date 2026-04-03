@@ -20,7 +20,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate(user.can_access_admin ? "/admin" : "/perfil", { replace: true });
+      navigate(user.can_access_admin ? "/admin" : "/", { replace: true });
     }
   }, [loading, user, navigate]);
 
@@ -32,7 +32,7 @@ export default function LoginPage() {
     try {
       const data = await loginUser(form);
       login(data.user);
-      navigate(data.user.can_access_admin ? "/admin" : "/perfil", { replace: true });
+      navigate(data.user.can_access_admin ? "/admin" : "/", { replace: true });
     } catch (errorData) {
       setError(getErrorMessage(errorData, "No se pudo iniciar sesion."));
     } finally {

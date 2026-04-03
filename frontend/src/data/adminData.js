@@ -21,10 +21,10 @@ export const adminProducts = [
 ];
 
 export const adminSections = [
-  { id: "overview", label: "Resumen", icon: "dashboard", requiredPermission: null },
-  { id: "products", label: "Productos", icon: "products", requiredPermission: "productos.ver" },
-  { id: "users", label: "Usuarios", icon: "users", requiredPermission: "usuarios.ver" },
-  { id: "inventory", label: "Inventario", icon: "inventory", requiredPermission: "inventario.ver" },
-  { id: "customers", label: "Clientes", icon: "customers", requiredPermission: "clientes.ver" },
-  { id: "roles-permisos", label: "Roles y permisos", icon: "settings", requiredPermission: "usuarios.gestionar" },
+  { id: "overview", label: "Resumen", icon: "dashboard", path: "/admin/resumen", requiredPermission: null },
+  { id: "products", label: "Productos", icon: "products", path: "/admin/productos", requiredPermission: "productos.ver" },
+  { id: "users", label: "Usuarios", icon: "users", path: "/admin/usuarios", requiredPermission: "usuarios.ver" },
+  { id: "inventory", label: "Inventario", icon: "inventory", path: "/admin/inventarios", requiredPermission: "inventario.ver" },
+  { id: "customers", label: "Clientes", icon: "customers", path: "/admin/clientes", requiredPermission: "clientes.ver" },
+  { id: "roles-permisos", label: "Roles y permisos", icon: "settings", path: "/admin/roles-permisos", requiredPermission: "usuarios.gestionar" },
 ];

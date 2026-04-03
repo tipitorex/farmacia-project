@@ -8,6 +8,11 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 // Lazy-loaded pages
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
+const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
+const AdminRolesPermisosPage = lazy(() => import("./pages/admin/AdminRolesPermisosPage"));
+const AdminInventariosPage = lazy(() => import("./pages/admin/AdminInventariosPage"));
+const AdminProductosPage = lazy(() => import("./pages/admin/AdminProductosPage"));
+const AdminClientesPage = lazy(() => import("./pages/admin/AdminClientesPage"));
 const ClientePerfilPage = lazy(() => import("./pages/ClientePerfilPage"));
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
@@ -33,7 +38,13 @@ function App() {
         </Route>
 
         <Route element={<AdminRoute />}>
-          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin" element={<Navigate to="/admin/resumen" replace />} />
+          <Route path="/admin/resumen" element={<AdminDashboardPage />} />
+          <Route path="/admin/usuarios" element={<AdminUsersPage />} />
+          <Route path="/admin/roles-permisos" element={<AdminRolesPermisosPage />} />
+          <Route path="/admin/inventarios" element={<AdminInventariosPage />} />
+          <Route path="/admin/productos" element={<AdminProductosPage />} />
+          <Route path="/admin/clientes" element={<AdminClientesPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

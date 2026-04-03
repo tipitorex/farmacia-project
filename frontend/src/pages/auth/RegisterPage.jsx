@@ -21,7 +21,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate(user.can_access_admin ? "/admin" : "/perfil", { replace: true });
+      navigate(user.can_access_admin ? "/admin" : "/", { replace: true });
     }
   }, [loading, user, navigate]);
 
