@@ -1,5 +1,6 @@
 from django.urls import path
+from .views import stock_disponible_list
 
 urlpatterns = [
-    # Base de rutas de la app inventarios (pendiente de endpoints).
+    path("stock/", stock_disponible_list, name="inventario-stock-list"),
 ]

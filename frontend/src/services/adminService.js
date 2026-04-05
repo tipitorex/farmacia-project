@@ -100,3 +100,25 @@ export async function deleteRole(accessToken, roleName) {
     headers: authHeaders(accessToken),
   });
 }
+
+export async function listInventoryStock(accessToken, params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.search?.trim()) {
+    query.set("search", params.search.trim());
+  }
+
+  if (params.status && params.status !== "all") {
+    query.set("status", params.status);
+  }
+
+  const queryString = query.toString();
+  const endpoint = queryString
+    ? `${getApiBaseUrl()}/api/inventarios/stock/?${queryString}`
+    : `${getApiBaseUrl()}/api/inventarios/stock/`;
+
+  return requestJsonWithAuthRetry(endpoint, {
+    method: "GET",
+    headers: authHeaders(accessToken),
+  });
+}
