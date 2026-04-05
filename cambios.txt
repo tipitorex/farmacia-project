@@ -62,3 +62,11 @@ NOTA
 - Impacto para el equipo:
   - despues de actualizar el repo deben ejecutar `python manage.py migrate` o su equivalente en Docker
   - si no corren migraciones, el modulo de inventarios no funcionara
+
+8. Ajuste de host local en frontend para cookies de autenticacion
+- Se actualizo `frontend/src/services/apiClient.js`.
+- Motivo: si el frontend se abre en `localhost` pero la API queda configurada en `127.0.0.1` (o al reves), el navegador puede no reenviar cookies JWT por tratarlo como sitio cruzado.
+- Solucion aplicada:
+  - si la URL de la API configurada usa `localhost` o `127.0.0.1`, el frontend la normaliza automaticamente al mismo host con el que se abrio la app.
+- Impacto para el equipo:
+  - mejora compatibilidad local sin afectar despliegues con dominios distintos
