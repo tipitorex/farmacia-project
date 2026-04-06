@@ -39,7 +39,7 @@ class EntradaStockViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """Crear entrada de stock con validación de permisos."""
         # Verificar si el usuario tiene permiso de registrar entrada
-        if not (tiene_permiso(request.user, 'registrar_entrada_stock') or 
+        if not (tiene_permiso(request.user, 'inventario.registrar_entrada') or 
                 request.user.groups.filter(name=ROLE_FARMACEUTICO).exists() or
                 request.user.is_superuser):
             return Response(
