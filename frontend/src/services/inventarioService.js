@@ -1,12 +1,10 @@
-import { requestJsonWithAuthRetry } from './apiClient';
+﻿import { requestJsonWithAuthRetry } from './apiClient';
 
-// Helper para construir query string
 const buildQuery = (params) => {
   if (!params) return '';
   return '?' + new URLSearchParams(params).toString();
 };
 
-// Servicio de Categorías
 export const categoriasService = {
   listar: (params) => requestJsonWithAuthRetry(`/api/inventarios/categorias/${buildQuery(params)}`),
   crear: (data) => requestJsonWithAuthRetry('/api/inventarios/categorias/', {
@@ -24,7 +22,6 @@ export const categoriasService = {
   }),
 };
 
-// Servicio de Subcategorías (opcional)
 export const subcategoriasService = {
   listar: (params) => requestJsonWithAuthRetry(`/api/inventarios/subcategorias/${buildQuery(params)}`),
   crear: (data) => requestJsonWithAuthRetry('/api/inventarios/subcategorias/', {
@@ -42,7 +39,6 @@ export const subcategoriasService = {
   }),
 };
 
-// Servicio de Laboratorios
 export const laboratoriosService = {
   listar: (params) => requestJsonWithAuthRetry(`/api/inventarios/laboratorios/${buildQuery(params)}`),
   crear: (data) => requestJsonWithAuthRetry('/api/inventarios/laboratorios/', {
@@ -60,7 +56,6 @@ export const laboratoriosService = {
   }),
 };
 
-// Servicio de Productos
 export const productosService = {
   listar: (params) => requestJsonWithAuthRetry(`/api/inventarios/productos/${buildQuery(params)}`),
   obtener: (id) => requestJsonWithAuthRetry(`/api/inventarios/productos/${id}/`),
@@ -87,7 +82,32 @@ export const productosService = {
   sinStock: () => requestJsonWithAuthRetry('/api/inventarios/productos/sin_stock/'),
 };
 
-// Servicio de Movimientos (solo lectura)
 export const movimientosService = {
   listar: (params) => requestJsonWithAuthRetry(`/api/inventarios/movimientos/${buildQuery(params)}`),
 };
+
+export async function obtenerProductos() {
+  return productosService.listar();
+}
+
+export async function crearEntradaStock(data) {
+  return requestJsonWithAuthRetry('/api/inventarios/entradas-stock/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function obtenerEntradasStock() {
+  return requestJsonWithAuthRetry('/api/inventarios/entradas-stock/');
+}
+
+export async function obtenerUltimasEntradas() {
+  return requestJsonWithAuthRetry('/api/inventarios/entradas-stock/ultimas/');
+}
+
+export async function obtenerEntradasPorProducto(productoId) {
+  return requestJsonWithAuthRetry(`/api/inventarios/entradas-stock/por_producto/?producto_id=${productoId}`);
+}
