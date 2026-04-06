@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { crearEntradaStock, obtenerProductos } from "../../services/inventarioService";
 
-export default function RegistroEntradaStockForm({ onSuccess, isLoading = false }) {
+export default function RegistroEntradaStockForm({ onSuccess, isLoading = false, compact = false, onCancel }) {
   const [productos, setProductos] = useState([]);
   const [formData, setFormData] = useState({
     producto: "",
@@ -119,30 +119,23 @@ export default function RegistroEntradaStockForm({ onSuccess, isLoading = false 
       setLoading(false);
     }
   };
-
-  return (
-    <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-md">
-      <h2 className="text-2xl font-black text-slate-900">Registrar entrada de stock</h2>
-      <p className="mt-2 text-sm text-slate-600">
-        Suma unidades al inventario cuando llega nueva mercadería.
-      </p>
-
+  const form = (
+    <>
       {successMessage && (
-        <div className="mt-4 rounded-lg bg-green-50 p-4 text-green-700 border border-green-200">
+        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700">
           {successMessage}
         </div>
       )}
 
       {errors.general && (
-        <div className="mt-4 rounded-lg bg-red-50 p-4 text-red-700 border border-red-200">
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
           {errors.general}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-        {/* Producto */}
+      <form onSubmit={handleSubmit} className={compact ? "space-y-4" : "mt-6 space-y-4"}>
         <div>
-          <label htmlFor="producto" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="producto" className="mb-1 block text-sm font-medium text-slate-700">
             Producto
           </label>
           <select
@@ -151,9 +144,9 @@ export default function RegistroEntradaStockForm({ onSuccess, isLoading = false 
             value={formData.producto}
             onChange={handleInputChange}
             disabled={loading || isLoading}
-            className={`mt-1 w-full rounded-lg border ${
+            className={`h-11 w-full rounded-xl border ${
               errors.producto ? "border-red-500" : "border-slate-300"
-            } px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-500`}
+            } bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100 disabled:text-slate-500`}
           >
             <option value="">Selecciona un producto</option>
             {productos.map((producto) => (
@@ -162,14 +155,11 @@ export default function RegistroEntradaStockForm({ onSuccess, isLoading = false 
               </option>
             ))}
           </select>
-          {errors.producto && (
-            <p className="mt-1 text-sm text-red-600">{errors.producto}</p>
-          )}
+          {errors.producto && <p className="mt-1 text-sm text-red-600">{errors.producto}</p>}
         </div>
 
-        {/* Cantidad */}
         <div>
-          <label htmlFor="cantidad" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="cantidad" className="mb-1 block text-sm font-medium text-slate-700">
             Cantidad
           </label>
           <input
@@ -181,18 +171,15 @@ export default function RegistroEntradaStockForm({ onSuccess, isLoading = false 
             onChange={handleInputChange}
             disabled={loading || isLoading}
             placeholder="Ej: 25"
-            className={`mt-1 w-full rounded-lg border ${
+            className={`h-11 w-full rounded-xl border ${
               errors.cantidad ? "border-red-500" : "border-slate-300"
-            } px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-500`}
+            } bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100 disabled:text-slate-500`}
           />
-          {errors.cantidad && (
-            <p className="mt-1 text-sm text-red-600">{errors.cantidad}</p>
-          )}
+          {errors.cantidad && <p className="mt-1 text-sm text-red-600">{errors.cantidad}</p>}
         </div>
 
-        {/* Motivo */}
         <div>
-          <label htmlFor="motivo" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="motivo" className="mb-1 block text-sm font-medium text-slate-700">
             Motivo
           </label>
           <select
@@ -201,9 +188,9 @@ export default function RegistroEntradaStockForm({ onSuccess, isLoading = false 
             value={formData.motivo}
             onChange={handleInputChange}
             disabled={loading || isLoading}
-            className={`mt-1 w-full rounded-lg border ${
+            className={`h-11 w-full rounded-xl border ${
               errors.motivo ? "border-red-500" : "border-slate-300"
-            } px-3 py-2 text-slate-900 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-500`}
+            } bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100 disabled:text-slate-500`}
           >
             {MOTIVOS.map((motivo) => (
               <option key={motivo.value} value={motivo.value}>
@@ -211,14 +198,11 @@ export default function RegistroEntradaStockForm({ onSuccess, isLoading = false 
               </option>
             ))}
           </select>
-          {errors.motivo && (
-            <p className="mt-1 text-sm text-red-600">{errors.motivo}</p>
-          )}
+          {errors.motivo && <p className="mt-1 text-sm text-red-600">{errors.motivo}</p>}
         </div>
 
-        {/* Descripción */}
         <div>
-          <label htmlFor="descripcion" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="descripcion" className="mb-1 block text-sm font-medium text-slate-700">
             Descripción (opcional)
           </label>
           <textarea
@@ -229,19 +213,42 @@ export default function RegistroEntradaStockForm({ onSuccess, isLoading = false 
             disabled={loading || isLoading}
             placeholder="Ej: Reposición proveedor abril"
             rows="3"
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:bg-slate-100 disabled:text-slate-500"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100 disabled:text-slate-500"
           />
         </div>
 
-        {/* Botón */}
-        <button
-          type="submit"
-          disabled={loading || isLoading}
-          className="mt-6 rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading || isLoading ? "Registrando..." : "Registrar entrada"}
-        </button>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {compact && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              disabled={loading || isLoading}
+            >
+              Cancelar
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={loading || isLoading}
+            className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {loading || isLoading ? "Registrando..." : "Registrar entrada"}
+          </button>
+        </div>
       </form>
+    </>
+  );
+
+  if (compact) return form;
+
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-md">
+      <h2 className="text-2xl font-black text-slate-900">Registrar entrada de stock</h2>
+      <p className="mt-2 text-sm text-slate-600">
+        Suma unidades al inventario cuando llega nueva mercadería.
+      </p>
+      {form}
     </div>
   );
 }
