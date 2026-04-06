@@ -14,6 +14,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from inventarios.models import MedicamentoGenerico, MedicamentoComercial
+from .serializers import MedicamentoComercialSerializer
+
 
 from .serializers import (
     AdminUserCreateSerializer,
@@ -26,6 +29,7 @@ from .serializers import (
     RolCreateUpdateSerializer,
     RolSerializer,
     UserSerializer,
+    MedicamentoComercialSerializer,
 )
 from .audit import log_auth_event
 from .rbac import (
@@ -594,3 +598,60 @@ def password_reset_confirm(request):
     log_auth_event(request, "password-reset-confirm", outcome="success", user_id=user.id)
 
     return Response({"detail": "Contrasena actualizada correctamente."}, status=status.HTTP_200_OK)
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def admin_medicamentos_list(request):
+    
+    if request.method == "GET":
+        texto = request.query_params.get('generico', '').strip()
+        
+        if texto:
+            # Busca marcas filtrando por el nombre del genérico relacionado
+            queryset = MedicamentoComercial.objects.filter(
+                generico__nombre_generico__icontains=texto
+            ).order_by('-id')
+        else:
+            queryset = MedicamentoComercial.objects.all().order_by('-id')
+            
+        serializer = MedicamentoComercialSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    if request.method == "POST":
+        data = request.data
+        
+        nom_generico = data.get('nombreGenerico') or data.get('nombre_generico', '').strip()
+        nom_comercial = data.get('nombreComercial') or data.get('nombre_comercial', '').strip()
+        lab = data.get('laboratorio', 'Desconocido')
+        prec = data.get('precio', 0.00)
+
+        if not nom_generico or not nom_comercial:
+            return Response({"error": "Nombres genérico y comercial son obligatorios"}, status=400)
+
+        try:
+            generico_obj, _ = MedicamentoGenerico.objects.get_or_create(
+                nombre_generico=nom_generico
+            )
+            
+            nueva_marca = MedicamentoComercial.objects.create(
+                nombre_comercial=nom_comercial,
+                laboratorio=lab,
+                precio=prec,
+                generico=generico_obj
+            )
+            
+            serializer = MedicamentoComercialSerializer(nueva_marca)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def admin_medicamento_detalle(request, pk):
+    try:
+        medicamento = MedicamentoComercial.objects.get(pk=pk)
+        medicamento.delete()
+        return Response({"mensaje": "Eliminado correctamente"}, status=status.HTTP_200_OK)
+    except MedicamentoComercial.DoesNotExist:
+        return Response({"error": "No existe"}, status=status.HTTP_404_NOT_FOUND)

@@ -22,7 +22,13 @@ export const adminProducts = [
 
 export const adminSections = [
   { id: "overview", label: "Resumen", icon: "dashboard", path: "/admin/resumen", requiredPermission: null },
-  { id: "products", label: "Productos", icon: "products", path: "/admin/productos", requiredPermission: "productos.ver" },
+  
+  // --- AQUI ESTA EL CAMBIO DE PRODUCTOS ---
+  // Cambiamos el id "products" por estos dos nuevos, para que el AdminLayout los agrupe
+  { id: "productos-catalogo", label: "Catálogo", icon: "products", path: "/admin/productos", requiredPermission: "productos.ver" },
+  { id: "productos-registro", label: "Registro de medicamentos", icon: "products", path: "/admin/productos/registro", requiredPermission: "productos.ver" },
+  // ----------------------------------------
+
   { id: "users", label: "Usuarios", icon: "users", path: "/admin/usuarios", requiredPermission: "usuarios.ver" },
   { id: "inventory", label: "Inventario", icon: "inventory", path: "/admin/inventarios", requiredPermission: "inventario.ver" },
   { id: "customers", label: "Clientes", icon: "customers", path: "/admin/clientes", requiredPermission: "clientes.ver" },

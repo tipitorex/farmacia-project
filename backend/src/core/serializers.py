@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db.models import Q
 from rest_framework import serializers
+from inventarios.models import MedicamentoGenerico, MedicamentoComercial
 
 from .rbac import (
     ROLE_ADMIN,
@@ -296,3 +297,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         validate_password(attrs["password"])
         return attrs
+
+class MedicamentoComercialSerializer(serializers.ModelSerializer):
+    nombre_generico = serializers.CharField(source='generico.nombre_generico', read_only=True)
+
+    class Meta:
+        model = MedicamentoComercial
+        fields = ['id', 'nombre_generico', 'nombre_comercial', 'laboratorio', 'precio', 'stock']

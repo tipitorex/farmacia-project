@@ -100,3 +100,33 @@ export async function deleteRole(accessToken, roleName) {
     headers: authHeaders(accessToken),
   });
 }
+export async function createMedicamento(accessToken, payload) {
+  return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/medicamentos/`, {
+    method: "POST",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify({
+      nombre_generico: payload.nombreGenerico,
+      nombre_comercial: payload.nombreComercial,
+      laboratorio: payload.laboratorio, // Nuevo
+      precio: payload.precio // Nuevo
+    }),
+  });
+}
+
+export async function searchMedicamentos(accessToken, nombreGenerico) {
+  const endpoint = nombreGenerico 
+    ? `${getApiBaseUrl()}/api/admin/medicamentos/?generico=${nombreGenerico}`
+    : `${getApiBaseUrl()}/api/admin/medicamentos/`;
+
+  return requestJsonWithAuthRetry(endpoint, {
+    method: "GET",
+    headers: authHeaders(accessToken),
+  });
+}
+export async function deleteMedicamento(accessToken, id) {
+  const endpoint = `${getApiBaseUrl()}/api/admin/medicamentos/${id}/`;
+  return requestJsonWithAuthRetry(endpoint, {
+    method: "DELETE",
+    headers: authHeaders(accessToken),
+  });
+}

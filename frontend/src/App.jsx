@@ -6,6 +6,7 @@ import AdminRoute from "./components/routing/AdminRoute";
 import PageLoader from "./components/routing/PageLoader";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
+
 // Lazy-loaded pages
 const AdminDashboardPage = lazy(() => import("./pages/AdminDashboardPage"));
 const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
@@ -19,6 +20,7 @@ const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/auth/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/auth/ResetPasswordPage"));
 const VerifyEmailPage = lazy(() => import("./pages/auth/VerifyEmailPage"));
+const AdminRegistroMedicamentosPage = lazy(() => import("./pages/admin/AdminRegistroMedicamentosPage"));
 
 function App() {
   return (
@@ -38,6 +40,7 @@ function App() {
         </Route>
 
         <Route element={<AdminRoute />}>
+          <Route path="/admin/productos/registro" element={<AdminRegistroMedicamentosPage />} />
           <Route path="/admin" element={<Navigate to="/admin/resumen" replace />} />
           <Route path="/admin/resumen" element={<AdminDashboardPage />} />
           <Route path="/admin/usuarios" element={<AdminUsersPage />} />

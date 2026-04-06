@@ -1,5 +1,6 @@
 from django.urls import path
 
+# Agregamos 'admin_medicamento_detalle' a la lista de importación
 from .views import (
     admin_permisos_catalogo,
     admin_role_detail,
@@ -15,6 +16,8 @@ from .views import (
     refresh_session,
     register,
     verify_email,
+    admin_medicamentos_list,
+    admin_medicamento_detalle, # <--- IMPORTANTE: Agrégala aquí
 )
 
 urlpatterns = [
@@ -32,4 +35,6 @@ urlpatterns = [
     path("admin/roles/", admin_roles_list, name="admin-roles-list"),
     path("admin/roles/<str:role_name>/", admin_role_detail, name="admin-role-detail"),
     path("admin/permisos/", admin_permisos_catalogo, name="admin-permisos-catalogo"),
+    path("admin/medicamentos/", admin_medicamentos_list, name="admin-medicamentos-list"),  
+    path('admin/medicamentos/<int:pk>/', admin_medicamento_detalle, name="admin-medicamento-detalle"),
 ]

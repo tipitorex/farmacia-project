@@ -20,6 +20,10 @@ import { useAuth } from "../../context/AuthContext";
 export default function AdminLayout({ activeSection, setActiveSection, currentUser, onLogout, children }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showUsersSection, setShowUsersSection] = useState(true);
+  
+  // 1. NUEVO: Estado para abrir/cerrar el menú de productos
+  const [showProductsSection, setShowProductsSection] = useState(false);
+  
   const userMenuRef = useRef(null);
   const { hasPermission } = useAuth();
   const location = useLocation();
@@ -40,6 +44,9 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
   );
 
   const userManagementSectionIds = ["users", "roles-permisos"];
+  
+  // 2. NUEVO: Le decimos cuáles IDs pertenecen al grupo de Productos
+  const productManagementSectionIds = ["productos-catalogo", "productos-registro"];
 
   const activeSectionByPath = useMemo(() => {
     return adminSections.find((section) => section.path === location.pathname)?.id || null;
@@ -63,8 +70,18 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
     [visibleSections]
   );
 
+  // 3. NUEVO: Filtramos las secciones de productos
+  const productManagementSections = useMemo(
+    () => visibleSections.filter((section) => productManagementSectionIds.includes(section.id)),
+    [visibleSections]
+  );
+
+  // MODIFICADO: Sacamos tanto a usuarios como a productos de las secciones regulares
   const regularSections = useMemo(
-    () => visibleSections.filter((section) => !userManagementSectionIds.includes(section.id)),
+    () => visibleSections.filter((section) => 
+      !userManagementSectionIds.includes(section.id) && 
+      !productManagementSectionIds.includes(section.id)
+    ),
     [visibleSections]
   );
 
@@ -79,6 +96,9 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
   );
 
   const isUsersSectionActive = userManagementSections.some((section) => section.id === resolvedActiveSection);
+  
+  // 4. NUEVO: Saber si alguna ruta de productos está activa para pintar el botón
+  const isProductsSectionActive = productManagementSections.some((section) => section.id === resolvedActiveSection);
 
   const fullName = useMemo(() => {
     return [currentUser?.first_name, currentUser?.last_name].filter(Boolean).join(" ").trim();
@@ -124,6 +144,7 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
           </div>
 
           <nav className="space-y-1.5">
+            {/* OVERVIEW */}
             {overviewSection ? (() => {
               const Icon = iconMap[overviewSection.icon] || ShieldIcon;
               const isActive = resolvedActiveSection === overviewSection.id;
@@ -147,6 +168,7 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
               );
             })() : null}
 
+            {/* ACORDEÓN DE USUARIOS */}
             {userManagementSections.length ? (
               <div className="space-y-1.5">
                 <button
@@ -189,6 +211,50 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
               </div>
             ) : null}
 
+            {/* 5. NUEVO: ACORDEÓN DE PRODUCTOS */}
+            {productManagementSections.length ? (
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowProductsSection((prev) => !prev)}
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    isProductsSectionActive
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${isProductsSectionActive ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>
+                    <PackageIcon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 truncate">Productos</span>
+                  <ChevronDownIcon className={`h-4 w-4 transition ${showProductsSection ? "rotate-180" : ""}`} />
+                </button>
+
+                {showProductsSection ? (
+                  <div className="space-y-1 pl-3">
+                    {productManagementSections.map((section) => {
+                      const isActive = resolvedActiveSection === section.id;
+                      return (
+                        <button
+                          key={section.id}
+                          type="button"
+                          onClick={() => handleSectionAction(section)}
+                          className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                            isActive
+                              ? "border-teal-600 bg-teal-50 text-teal-700"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span className="truncate">{section.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* RESTO DE BOTONES (Inventario, Clientes, etc.) */}
             {otherRegularSections.map((section) => {
               const Icon = iconMap[section.icon] || ShieldIcon;
               const isActive = resolvedActiveSection === section.id;
