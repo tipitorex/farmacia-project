@@ -23,6 +23,8 @@ export const adminProducts = [
 export const adminSections = [
   { id: "overview", label: "Resumen", icon: "dashboard", path: "/admin/resumen", requiredPermission: null },
   { id: "products", label: "Productos", icon: "products", path: "/admin/productos", requiredPermission: "productos.ver" },
+  { id: "labs", label: "Laboratorios", icon: "products", path: "/admin/laboratorios", requiredPermission: "laboratorios.ver" },
+  { id: "categories", label: "Categorias", icon: "products", path: "/admin/categorias", requiredPermission: "categorias.ver" },
   { id: "users", label: "Usuarios", icon: "users", path: "/admin/usuarios", requiredPermission: "usuarios.ver" },
   { id: "inventory", label: "Inventario", icon: "inventory", path: "/admin/inventarios", requiredPermission: "inventario.ver" },
   { id: "customers", label: "Clientes", icon: "customers", path: "/admin/clientes", requiredPermission: "clientes.ver" },

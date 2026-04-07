@@ -99,6 +99,14 @@ export function ChevronDownIcon({ className }) {
   );
 }
 
+export function ChevronRightIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="m9 18 6-6-6-6" />
+    </BaseIcon>
+  );
+}
+
 export function ShieldIcon({ className }) {
   return (
     <BaseIcon className={className}>

@@ -100,6 +100,18 @@ Usuarios creados por defecto:
 - jorge.vargas@saludplus.com (cliente)
 
 Contrasena por defecto: `SaludPlus2026*`
+
+Sembrar 10 laboratorios demo para pruebas de gestion de laboratorios:
+
+```bash
+docker compose exec backend python manage.py seed_laboratorios_demos
+```
+
+Sembrar 10 categorias con sus respectivas subcat. demo para pruebas de gestion de categorias:
+
+```bash
+docker compose exec backend python manage.py seed_categorias_subcategorias_demos
+```
 ## 4) Mobile (Flutter)
 
 Dentro de `mobile/`:
