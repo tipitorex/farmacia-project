@@ -111,11 +111,7 @@ class _RegisterEditorialPanel extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Image.asset(
-                    'assets/app/icon.png',
-                    width: 36,
-                    height: 36,
-                  ),
+                  Image.asset('assets/app/icon.png', width: 36, height: 36),
                   const SizedBox(width: 8),
                   Text(
                     'Farmacia Bibosi',
@@ -308,11 +304,7 @@ class _RegisterFormPanelState extends State<_RegisterFormPanel> {
                 Center(
                   child: Column(
                     children: [
-                      Image.asset(
-                        'assets/app/icon.png',
-                        width: 64,
-                        height: 64,
-                      ),
+                      Image.asset('assets/app/icon.png', width: 64, height: 64),
                       const SizedBox(height: 8),
                       Text(
                         'Farmacia Bibosi',

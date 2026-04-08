@@ -159,11 +159,7 @@ class _LoginPanelState extends State<_LoginPanel> {
               Center(
                 child: Column(
                   children: [
-                    Image.asset(
-                      'assets/app/icon.png',
-                      width: 64,
-                      height: 64,
-                    ),
+                    Image.asset('assets/app/icon.png', width: 64, height: 64),
                     const SizedBox(height: 8),
                     Text(
                       'Farmacia Bibosi',
@@ -442,11 +438,7 @@ class _BrandingPanel extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Image.asset(
-                    'assets/app/icon.png',
-                    width: 40,
-                    height: 40,
-                  ),
+                  Image.asset('assets/app/icon.png', width: 40, height: 40),
                   const SizedBox(width: 8),
                   Text(
                     'Farmacia Bibosi',
