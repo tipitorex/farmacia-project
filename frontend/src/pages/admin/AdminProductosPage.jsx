@@ -1,8 +1,30 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
+import ProductsPagination from "../../components/admin/ProductsPagination";
+import ProductsHeaderToolbar from "../../components/admin/products/ProductsHeaderToolbar";
+import ProductsTable from "../../components/admin/products/ProductsTable";
+import ProductFormModal from "../../components/admin/products/ProductFormModal";
+import ProductCategoryModal from "../../components/admin/products/ProductCategoryModal";
+import ProductDetailModal from "../../components/admin/products/ProductDetailModal";
 import { useAuth } from "../../context/AuthContext";
-import { productosService, categoriasService, laboratoriosService } from "../../services/inventarioService";
+import { productosService, categoriasService, subcategoriasService, laboratoriosService } from "../../services/inventarioService";
+import { getApiBaseUrl } from "../../services/apiClient";
+
+const PRODUCTOS_PAGE_SIZE = 10;
+
+function normalizeListResponse(response) {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.results)) return response.results;
+  return [];
+}
+
+function buildImageUrl(imagen) {
+  if (!imagen) return "";
+  if (/^https?:\/\//i.test(imagen)) return imagen;
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  return `${baseUrl}${imagen.startsWith("/") ? "" : "/"}${imagen}`;
+}
 
 export default function AdminProductosPage() {
   const navigate = useNavigate();
@@ -10,18 +32,38 @@ export default function AdminProductosPage() {
 
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [subcategorias, setSubcategorias] = useState([]);
   const [laboratorios, setLaboratorios] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [subcategoryFilter, setSubcategoryFilter] = useState("all");
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedProductDetail, setSelectedProductDetail] = useState(null);
+  const [categorySaving, setCategorySaving] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+  const [categoryForm, setCategoryForm] = useState({
+    nombre: "",
+    descripcion: "",
+    subcategorias: [{ nombre: "", descripcion: "" }],
+  });
+  const [imagePreview, setImagePreview] = useState("");
+  const [productosPage, setProductosPage] = useState(1);
+  const [totalProductosCount, setTotalProductosCount] = useState(0);
   const [formData, setFormData] = useState({
     sku: "",
     nombre_comercial: "",
     nombre_generico: "",
     descripcion: "",
     categoria_id: "",
+    subcategoria_id: "",
     laboratorio_id: "",
     forma_farmaceutica: "tableta",
     concentracion: "",
@@ -32,35 +74,104 @@ export default function AdminProductosPage() {
     stock_minimo: 0,
     requiere_receta: false,
     es_controlado: false,
+    imagen: null,
   });
 
   useEffect(() => {
+    return () => {
+      if (imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [productosPage, debouncedSearchTerm, categoryFilter, subcategoryFilter]);
 
   const cargarDatos = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [productosRes, categoriasRes, laboratoriosRes] = await Promise.all([
-        productosService.listar(),
+      const query = {
+        page: productosPage,
+        page_size: PRODUCTOS_PAGE_SIZE,
+      };
+
+      const normalizedSearch = debouncedSearchTerm.trim();
+      if (normalizedSearch) {
+        query.search = normalizedSearch;
+      }
+
+      if (categoryFilter !== "all") {
+        query.categoria = categoryFilter;
+      }
+
+      if (subcategoryFilter !== "all") {
+        query.subcategoria = subcategoryFilter;
+      }
+
+      const [productosRes, categoriasRes, subcategoriasRes, laboratoriosRes] = await Promise.all([
+        productosService.listar(query),
         categoriasService.listar({ estado: true }),
+        subcategoriasService.listar({ estado: true }),
         laboratoriosService.listar({ estado: true }),
       ]);
-      setProductos(Array.isArray(productosRes) ? productosRes : []);
-      setCategorias(Array.isArray(categoriasRes) ? categoriasRes : []);
-      setLaboratorios(Array.isArray(laboratoriosRes) ? laboratoriosRes : []);
+      setProductos(Array.isArray(productosRes?.results) ? productosRes.results : Array.isArray(productosRes) ? productosRes : []);
+
+      const totalCount = Number.isInteger(productosRes?.count) ? productosRes.count : (Array.isArray(productosRes) ? productosRes.length : 0);
+      setTotalProductosCount(totalCount);
+
+      const nextTotalPages = Math.max(1, Math.ceil(totalCount / PRODUCTOS_PAGE_SIZE));
+      if (productosPage > nextTotalPages) {
+        setProductosPage(nextTotalPages);
+      }
+
+      setCategorias(normalizeListResponse(categoriasRes));
+      setSubcategorias(normalizeListResponse(subcategoriasRes));
+      setLaboratorios(normalizeListResponse(laboratoriosRes));
     } catch (err) {
       console.error("Error al cargar datos:", err);
       setError("No se pudieron cargar los productos. Intente de nuevo.");
       setProductos([]);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (type === "file") {
+      const file = e.target.files?.[0] || null;
+      if (imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+      setImagePreview(file ? URL.createObjectURL(file) : editingProduct?.imagen ? buildImageUrl(editingProduct.imagen) : "");
+      setFormData((prev) => ({
+        ...prev,
+        [name]: file,
+      }));
+      return;
+    }
+
+    if (name === "categoria_id") {
+      setFormData((prev) => ({
+        ...prev,
+        categoria_id: value,
+        subcategoria_id: "",
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -100,24 +211,35 @@ export default function AdminProductosPage() {
       return;
     }
 
+    const subcategoriaId = formData.subcategoria_id ? parseInt(formData.subcategoria_id, 10) : null;
+    if (formData.subcategoria_id && Number.isNaN(subcategoriaId)) {
+      setError("Debes seleccionar una subcategoría válida.");
+      return;
+    }
+
     // Construir payload con los tipos correctos
-    const payload = {
-      sku: formData.sku,
-      nombre_comercial: formData.nombre_comercial,
-      nombre_generico: formData.nombre_generico,
-      descripcion: formData.descripcion,
-      categoria_id: categoriaId,
-      laboratorio_id: laboratorioId,
-      forma_farmaceutica: formData.forma_farmaceutica,
-      concentracion: formData.concentracion,
-      presentacion: formData.presentacion,
-      unidad_medida: formData.unidad_medida,
-      precio_compra: precioCompra,
-      precio_venta: precioVenta,
-      stock_minimo: stockMinimo,
-      requiere_receta: formData.requiere_receta,
-      es_controlado: formData.es_controlado,
-    };
+    const payload = new FormData();
+    payload.append("sku", formData.sku.trim());
+    payload.append("nombre_comercial", formData.nombre_comercial.trim());
+    payload.append("nombre_generico", formData.nombre_generico.trim());
+    payload.append("descripcion", formData.descripcion.trim());
+    payload.append("categoria_id", String(categoriaId));
+    if (subcategoriaId) {
+      payload.append("subcategoria_id", String(subcategoriaId));
+    }
+    payload.append("laboratorio_id", String(laboratorioId));
+    payload.append("forma_farmaceutica", formData.forma_farmaceutica);
+    payload.append("concentracion", formData.concentracion.trim());
+    payload.append("presentacion", formData.presentacion.trim());
+    payload.append("unidad_medida", formData.unidad_medida);
+    payload.append("precio_compra", String(precioCompra));
+    payload.append("precio_venta", String(precioVenta));
+    payload.append("stock_minimo", String(stockMinimo));
+    payload.append("requiere_receta", String(formData.requiere_receta));
+    payload.append("es_controlado", String(formData.es_controlado));
+    if (formData.imagen) {
+      payload.append("imagen", formData.imagen);
+    }
 
     try {
       setSaving(true);
@@ -145,7 +267,38 @@ export default function AdminProductosPage() {
     setShowForm(true);
   };
 
+  const handleOpenCategoryModal = () => {
+    setShowCategoryModal(true);
+    setCategoryError("");
+    setCategoryForm({
+      nombre: "",
+      descripcion: "",
+      subcategorias: [{ nombre: "", descripcion: "" }],
+    });
+  };
+
+  const handleCloseCategoryModal = () => {
+    setShowCategoryModal(false);
+    setCategoryError("");
+    setCategoryForm({
+      nombre: "",
+      descripcion: "",
+      subcategorias: [{ nombre: "", descripcion: "" }],
+    });
+  };
+
+  const handleOpenDetailModal = (producto) => {
+    setSelectedProductDetail(producto);
+    setShowDetailModal(true);
+  };
+
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedProductDetail(null);
+  };
+
   const handleEdit = (producto) => {
+    handleCloseDetailModal();
     setEditingProduct(producto);
     setError(null);
     setFormData({
@@ -154,6 +307,7 @@ export default function AdminProductosPage() {
       nombre_generico: producto.nombre_generico,
       descripcion: producto.descripcion,
       categoria_id: producto.categoria,
+      subcategoria_id: producto.subcategoria || "",
       laboratorio_id: producto.laboratorio,
       forma_farmaceutica: producto.forma_farmaceutica,
       concentracion: producto.concentracion,
@@ -164,7 +318,9 @@ export default function AdminProductosPage() {
       stock_minimo: producto.stock_minimo,
       requiere_receta: producto.requiere_receta,
       es_controlado: producto.es_controlado,
+      imagen: null,
     });
+    setImagePreview(buildImageUrl(producto.imagen));
     setShowForm(true);
   };
 
@@ -181,14 +337,20 @@ export default function AdminProductosPage() {
   };
 
   const resetForm = () => {
+    if (imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
     setShowForm(false);
     setEditingProduct(null);
+    setImagePreview("");
     setFormData({
       sku: "",
       nombre_comercial: "",
       nombre_generico: "",
       descripcion: "",
       categoria_id: "",
+      subcategoria_id: "",
       laboratorio_id: "",
       forma_farmaceutica: "tableta",
       concentracion: "",
@@ -199,15 +361,103 @@ export default function AdminProductosPage() {
       stock_minimo: 0,
       requiere_receta: false,
       es_controlado: false,
+      imagen: null,
     });
   };
+
+  const handleCreateCategory = async (event) => {
+    event.preventDefault();
+    setCategoryError("");
+
+    const nombre = categoryForm.nombre.trim();
+    if (!nombre) {
+      setCategoryError("El nombre de la categoría es obligatorio.");
+      return;
+    }
+
+    try {
+      setCategorySaving(true);
+      const nuevaCategoria = await categoriasService.crear({
+        nombre,
+        descripcion: categoryForm.descripcion.trim(),
+        estado: true,
+      });
+
+      const categoriaCreada = nuevaCategoria?.id ? nuevaCategoria : null;
+      if (categoriaCreada) {
+        setCategorias((prev) => [categoriaCreada, ...prev].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+
+        const subcategoriasToCreate = (categoryForm.subcategorias || [])
+          .map((item) => ({
+            nombre: (item?.nombre || "").trim(),
+            descripcion: (item?.descripcion || "").trim(),
+          }))
+          .filter((item) => item.nombre);
+
+        if (subcategoriasToCreate.length > 0) {
+          const createdSubcategorias = await Promise.all(
+            subcategoriasToCreate.map((item) =>
+              subcategoriasService.crear({
+                categoria: categoriaCreada.id,
+                nombre: item.nombre,
+                descripcion: item.descripcion,
+                estado: true,
+              })
+            )
+          );
+
+          const validCreated = createdSubcategorias.filter((item) => item?.id);
+          if (validCreated.length > 0) {
+            setSubcategorias((prev) =>
+              [...validCreated, ...prev].sort((a, b) =>
+                `${a.categoria_nombre || ""}-${a.nombre}`.localeCompare(`${b.categoria_nombre || ""}-${b.nombre}`)
+              )
+            );
+          }
+        }
+      }
+
+      setCategoryForm({
+        nombre: "",
+        descripcion: "",
+        subcategorias: [{ nombre: "", descripcion: "" }],
+      });
+      handleCloseCategoryModal();
+    } catch (err) {
+      console.error("Error al crear categoría/subcategoría:", err);
+      setCategoryError(err?.detail || "No se pudo crear la categoría o subcategoría.");
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
+  const totalProductosPages = useMemo(() => {
+    return Math.max(1, Math.ceil(totalProductosCount / PRODUCTOS_PAGE_SIZE));
+  }, [totalProductosCount]);
+
+  const filteredSubcategoriasByCategoryFilter = useMemo(() => {
+    if (categoryFilter === "all") return [];
+    return subcategorias.filter((item) => String(item.categoria) === String(categoryFilter));
+  }, [subcategorias, categoryFilter]);
+
+  const filteredSubcategoriasForForm = useMemo(() => {
+    if (!formData.categoria_id) return [];
+    return subcategorias.filter((item) => String(item.categoria) === String(formData.categoria_id));
+  }, [subcategorias, formData.categoria_id]);
+
+  const paginationRangeText = useMemo(() => {
+    if (!totalProductosCount) return "Mostrando 0 de 0 productos";
+    const start = (productosPage - 1) * PRODUCTOS_PAGE_SIZE + 1;
+    const end = Math.min(productosPage * PRODUCTOS_PAGE_SIZE, totalProductosCount);
+    return `Mostrando ${start}-${end} de ${totalProductosCount} productos`;
+  }, [productosPage, totalProductosCount]);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login", { replace: true });
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <AdminLayout activeSection="products" currentUser={user} onLogout={handleLogout}>
         <div className="p-6">Cargando productos...</div>
@@ -217,184 +467,91 @@ export default function AdminProductosPage() {
 
   return (
     <AdminLayout activeSection="products" currentUser={user} onLogout={handleLogout}>
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-md">
-        <h1 className="text-2xl font-black text-slate-900">Admin / Productos</h1>
-        <p className="mt-2 text-sm text-slate-600 mb-6">Gestión completa de productos.</p>
+      <div className="space-y-6">
+        <ProductsHeaderToolbar
+          categorias={categorias}
+          subcategorias={filteredSubcategoriasByCategoryFilter}
+          searchTerm={searchTerm}
+          categoryFilter={categoryFilter}
+          subcategoryFilter={subcategoryFilter}
+          productosLength={productos.length}
+          totalProductosCount={totalProductosCount}
+          loading={loading}
+          onOpenCategoryModal={handleOpenCategoryModal}
+          onOpenCreate={handleOpenCreate}
+          onSearchChange={(value) => {
+            setSearchTerm(value);
+            setProductosPage(1);
+          }}
+          onCategoryFilterChange={(value) => {
+            setCategoryFilter(value);
+            setSubcategoryFilter("all");
+            setProductosPage(1);
+          }}
+          onSubcategoryFilterChange={(value) => {
+            setSubcategoryFilter(value);
+            setProductosPage(1);
+          }}
+        />
 
+        {/* Error Message */}
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 px-6 py-4 rounded-2xl text-sm font-medium">
             {error}
           </div>
         )}
 
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={handleOpenCreate}
-            className="rounded-lg bg-teal-700 px-4 py-2 text-white transition-colors hover:bg-teal-600"
-          >
-            + Nuevo Producto
-          </button>
-        </div>
+        <ProductsTable
+          productos={productos}
+          onOpenDetailModal={handleOpenDetailModal}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          buildImageUrl={buildImageUrl}
+        />
 
-        <div className="space-y-4">
-          {productos.length === 0 && !loading && <p className="text-center text-gray-500">No hay productos registrados.</p>}
-          {productos.map((producto) => (
-            <div key={producto.id} className="border rounded-lg p-4 shadow-sm">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-lg">{producto.nombre_comercial}</h3>
-                  <p className="text-sm text-gray-600">SKU: {producto.sku}</p>
-                  <p className="text-sm">Laboratorio: {producto.laboratorio_nombre}</p>
-                  <p className="text-sm">Categoría: {producto.categoria_nombre}</p>
-                  <p className="text-lg font-bold text-green-600 mt-1">Bs. {producto.precio_venta}</p>
-                  {producto.inventario && (
-                    <div className="mt-1 text-sm">
-                      <p>Stock actual: <span className={producto.inventario.stock_actual < producto.stock_minimo ? "text-red-600" : "text-green-600"}>{producto.inventario.stock_actual} unidades</span></p>
-                      <p>Disponible: {producto.inventario.stock_disponible} unidades</p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => handleEdit(producto)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm">Editar</button>
-                  <button onClick={() => handleDelete(producto.id)} className="bg-red-500 text-white px-3 py-1 rounded text-sm">Eliminar</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+        {/* Paginación */}
+        <ProductsPagination
+          loading={loading}
+          paginationRangeText={paginationRangeText}
+          currentPage={productosPage}
+          totalPages={totalProductosPages}
+          onPreviousPage={() => setProductosPage((prev) => Math.max(1, prev - 1))}
+          onNextPage={() => setProductosPage((prev) => Math.min(totalProductosPages, prev + 1))}
+        />
+      </div>
 
-      {showForm && (
-        <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/50 px-4 py-6 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Formulario de producto"
-          onClick={resetForm}
-        >
-          <div
-            className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(236,253,245,0.92),rgba(240,249,255,0.92))] px-6 py-5">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-700">Inventario</p>
-                  <h2 className="text-xl font-black text-slate-900">{editingProduct ? "Editar producto" : "Registrar producto"}</h2>
-                  <p className="mt-1 text-sm text-slate-600">Completa los datos principales y de precio para guardar el producto.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
+      <ProductFormModal
+        show={showForm}
+        editingProduct={editingProduct}
+        formData={formData}
+        categorias={categorias}
+        subcategorias={filteredSubcategoriasForForm}
+        laboratorios={laboratorios}
+        imagePreview={imagePreview}
+        saving={saving}
+        onClose={resetForm}
+        onSubmit={handleSubmit}
+        onInputChange={handleInputChange}
+        buildImageUrl={buildImageUrl}
+      />
 
-            <form onSubmit={handleSubmit} className="space-y-6 p-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">SKU</label>
-                  <input type="text" name="sku" placeholder="Ej: PARA-001" value={formData.sku} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Nombre comercial</label>
-                  <input type="text" name="nombre_comercial" placeholder="Ej: Paracetamol 500 mg" value={formData.nombre_comercial} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Nombre generico</label>
-                  <input type="text" name="nombre_generico" placeholder="Ej: Acetaminofen" value={formData.nombre_generico} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Forma farmaceutica</label>
-                  <select name="forma_farmaceutica" value={formData.forma_farmaceutica} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100">
-                    <option value="tableta">Tableta</option>
-                    <option value="capsula">Capsula</option>
-                    <option value="jarabe">Jarabe</option>
-                    <option value="crema">Crema</option>
-                    <option value="gotas">Gotas</option>
-                    <option value="inyectable">Inyectable</option>
-                    <option value="suspension">Suspension</option>
-                    <option value="polvo">Polvo</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Categoria</label>
-                  <select name="categoria_id" value={formData.categoria_id} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" required>
-                    <option value="">Selecciona categoria</option>
-                    {categorias.map((cat) => <option key={cat.id} value={cat.id}>{cat.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Laboratorio</label>
-                  <select name="laboratorio_id" value={formData.laboratorio_id} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" required>
-                    <option value="">Selecciona laboratorio</option>
-                    {laboratorios.map((lab) => <option key={lab.id} value={lab.id}>{lab.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Concentracion</label>
-                  <input type="text" name="concentracion" placeholder="Ej: 500 mg" value={formData.concentracion} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Presentacion</label>
-                  <input type="text" name="presentacion" placeholder="Ej: Caja x 20" value={formData.presentacion} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Unidad de medida</label>
-                  <select name="unidad_medida" value={formData.unidad_medida} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100">
-                    <option value="unidad">Unidad</option>
-                    <option value="caja">Caja</option>
-                    <option value="frasco">Frasco</option>
-                    <option value="blister">Blister</option>
-                    <option value="ampolla">Ampolla</option>
-                    <option value="sobre">Sobre</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Precio compra (Bs.)</label>
-                  <input type="number" step="0.01" min="0" name="precio_compra" placeholder="0.00" value={formData.precio_compra} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Precio venta (Bs.)</label>
-                  <input type="number" step="0.01" min="0" name="precio_venta" placeholder="0.00" value={formData.precio_venta} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" required />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Stock minimo</label>
-                  <input type="number" min="0" name="stock_minimo" placeholder="0" value={formData.stock_minimo} onChange={handleInputChange} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" required />
-                </div>
-              </div>
+      <ProductCategoryModal
+        show={showCategoryModal}
+        categoryForm={categoryForm}
+        categoryError={categoryError}
+        categorySaving={categorySaving}
+        onClose={handleCloseCategoryModal}
+        onSubmit={handleCreateCategory}
+        onFormChange={setCategoryForm}
+      />
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Descripcion</label>
-                <textarea name="descripcion" placeholder="Describe el producto, uso recomendado o detalles relevantes" value={formData.descripcion} onChange={handleInputChange} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-100" rows="3" />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                  <input type="checkbox" name="requiere_receta" checked={formData.requiere_receta} onChange={handleInputChange} className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500" />
-                  Requiere receta
-                </label>
-                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                  <input type="checkbox" name="es_controlado" checked={formData.es_controlado} onChange={handleInputChange} className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-500" />
-                  Es controlado
-                </label>
-              </div>
-
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button type="button" onClick={resetForm} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" disabled={saving}>
-                  Cancelar
-                </button>
-                <button type="submit" className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600 disabled:cursor-not-allowed disabled:bg-slate-400" disabled={saving}>
-                  {saving ? "Guardando..." : editingProduct ? "Actualizar producto" : "Crear producto"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProductDetailModal
+        show={showDetailModal}
+        selectedProductDetail={selectedProductDetail}
+        onClose={handleCloseDetailModal}
+        onEdit={handleEdit}
+        buildImageUrl={buildImageUrl}
+      />
     </AdminLayout>
   );
 }

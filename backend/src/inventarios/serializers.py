@@ -64,7 +64,7 @@ class ProductoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Producto
         fields = [
-            "id", "sku", "nombre_comercial", "nombre_generico", "descripcion",
+            "id", "sku", "nombre_comercial", "nombre_generico", "descripcion", "imagen",
             "categoria", "categoria_nombre", "categoria_id",
             "subcategoria", "subcategoria_nombre", "subcategoria_id",
             "laboratorio", "laboratorio_nombre", "laboratorio_id",
@@ -74,6 +74,24 @@ class ProductoSerializer(serializers.ModelSerializer):
             "inventario", "created_at", "updated_at"
         ]
         read_only_fields = ["id", "created_at", "updated_at", "categoria", "laboratorio", "subcategoria"]
+
+    def validate(self, attrs):
+        categoria = attrs.get("categoria")
+        subcategoria = attrs.get("subcategoria")
+
+        # On partial updates, fall back to instance values when fields are omitted.
+        if self.instance is not None:
+            if categoria is None:
+                categoria = self.instance.categoria
+            if subcategoria is None:
+                subcategoria = self.instance.subcategoria
+
+        if categoria and subcategoria and subcategoria.categoria_id != categoria.id:
+            raise serializers.ValidationError(
+                {"subcategoria_id": "La subcategoría seleccionada no pertenece a la categoría elegida."}
+            )
+
+        return attrs
 
 
 class MovimientoInventarioSerializer(serializers.ModelSerializer):

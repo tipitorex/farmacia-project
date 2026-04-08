@@ -215,14 +215,21 @@ class _HomeOverviewTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             gradient: const LinearGradient(
-              colors: [Color(0xFF006A5E), Color(0xFF008577)],
+              colors: [Color(0xFF005449), Color(0xFF008577), Color(0xFF32A58D)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x2600443B),
+                blurRadius: 18,
+                offset: Offset(0, 10),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,11 +253,30 @@ class _HomeOverviewTab extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Consulta productos, recetas y seguimiento de pedidos desde tu app cliente.',
+                'Consulta catalogo, recetas, puntos canjeables y pagos desde nuestra app movil.',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 14,
                   height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'Nuevos accesos para ti',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -258,7 +284,7 @@ class _HomeOverviewTab extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          'Accesos rapidos',
+          'Accesos rapidos para ti',
           style: GoogleFonts.manrope(
             fontWeight: FontWeight.w800,
             fontSize: 20,
@@ -270,8 +296,10 @@ class _HomeOverviewTab extends StatelessWidget {
           children: [
             Expanded(
               child: _QuickActionCard(
-                icon: Icons.search,
-                label: 'Buscar\nmedicamento',
+                icon: Icons.local_pharmacy_outlined,
+                label: 'Catalogo de\nproductos',
+                toneColor: Color(0xFF006A5E),
+                backgroundTint: Color(0xFFEAF8F4),
               ),
             ),
             SizedBox(width: 12),
@@ -279,6 +307,8 @@ class _HomeOverviewTab extends StatelessWidget {
               child: _QuickActionCard(
                 icon: Icons.receipt_long_outlined,
                 label: 'Mis\nrecetas',
+                toneColor: Color(0xFF1565C0),
+                backgroundTint: Color(0xFFEAF2FF),
               ),
             ),
           ],
@@ -288,15 +318,19 @@ class _HomeOverviewTab extends StatelessWidget {
           children: [
             Expanded(
               child: _QuickActionCard(
-                icon: Icons.local_shipping_outlined,
-                label: 'Seguimiento\nde pedido',
+                icon: Icons.workspace_premium_outlined,
+                label: 'Mis\npuntos',
+                toneColor: Color(0xFFB76E00),
+                backgroundTint: Color(0xFFFFF3E0),
               ),
             ),
             SizedBox(width: 12),
             Expanded(
               child: _QuickActionCard(
-                icon: Icons.support_agent_outlined,
-                label: 'Soporte\nfarmaceutico',
+                icon: Icons.payments_outlined,
+                label: 'Mis\npagos',
+                toneColor: Color(0xFF6A1B9A),
+                backgroundTint: Color(0xFFF6ECFF),
               ),
             ),
           ],
@@ -307,10 +341,17 @@ class _HomeOverviewTab extends StatelessWidget {
 }
 
 class _QuickActionCard extends StatelessWidget {
-  const _QuickActionCard({required this.icon, required this.label});
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.toneColor,
+    required this.backgroundTint,
+  });
 
   final IconData icon;
   final String label;
+  final Color toneColor;
+  final Color backgroundTint;
 
   @override
   Widget build(BuildContext context) {
@@ -318,34 +359,42 @@ class _QuickActionCard extends StatelessWidget {
       onTap: () {},
       borderRadius: BorderRadius.circular(16),
       child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: backgroundTint,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0x1ABDC9C5)),
+          border: Border.all(color: toneColor.withValues(alpha: 0.16)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x12000000),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0x1A8BF1E6),
-                shape: BoxShape.circle,
+              decoration: BoxDecoration(
+                color: toneColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: const Color(0xFF006A5E)),
+              child: Icon(icon, color: toneColor),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Color(0xFF191C1C),
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   height: 1.2,
                 ),
               ),
             ),
+            Icon(Icons.chevron_right_rounded, color: toneColor),
           ],
         ),
       ),

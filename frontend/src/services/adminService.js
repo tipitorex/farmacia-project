@@ -78,6 +78,49 @@ export async function listPermissionsCatalog(accessToken) {
   });
 }
 
+export async function getBitacora(params = {}) {
+  const query = new URLSearchParams();
+
+  if (params.page) query.set("page", String(params.page));
+  if (params.pageSize) query.set("page_size", String(params.pageSize));
+
+  if (params.accion && params.accion !== "all") {
+    query.set("accion", params.accion);
+  }
+
+  if (params.modulo && params.modulo !== "all") {
+    query.set("modulo", params.modulo);
+  }
+
+  if (params.resultado && params.resultado !== "all") {
+    query.set("resultado", params.resultado);
+  }
+
+  if (params.usuario_id && params.usuario_id !== "all") {
+    query.set("usuario_id", String(params.usuario_id));
+  }
+
+  if (params.fecha_desde) {
+    query.set("fecha_desde", params.fecha_desde);
+  }
+
+  if (params.fecha_hasta) {
+    query.set("fecha_hasta", params.fecha_hasta);
+  }
+
+  const queryString = query.toString();
+  const endpoint = queryString
+    ? `${getApiBaseUrl()}/api/admin/bitacora/?${queryString}`
+    : `${getApiBaseUrl()}/api/admin/bitacora/`;
+
+  return requestJsonWithAuthRetry(endpoint, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}
+
 export async function createRole(accessToken, payload) {
   return requestJsonWithAuthRetry(`${getApiBaseUrl()}/api/admin/roles/`, {
     method: "POST",

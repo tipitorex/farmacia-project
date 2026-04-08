@@ -159,10 +159,10 @@ class _LoginPanelState extends State<_LoginPanel> {
               Center(
                 child: Column(
                   children: [
-                    const Icon(
-                      Icons.medical_services,
-                      size: 50,
-                      color: Color(0xFF006A5E),
+                    Image.asset(
+                      'assets/app/icon.png',
+                      width: 64,
+                      height: 64,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -442,10 +442,10 @@ class _BrandingPanel extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(
-                    Icons.medical_services,
-                    color: Color(0xFF006A5E),
-                    size: 36,
+                  Image.asset(
+                    'assets/app/icon.png',
+                    width: 40,
+                    height: 40,
                   ),
                   const SizedBox(width: 8),
                   Text(

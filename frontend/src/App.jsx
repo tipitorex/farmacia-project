@@ -13,6 +13,7 @@ const AdminRolesPermisosPage = lazy(() => import("./pages/admin/AdminRolesPermis
 const AdminInventariosPage = lazy(() => import("./pages/admin/AdminInventariosPage"));
 const AdminProductosPage = lazy(() => import("./pages/admin/AdminProductosPage"));
 const AdminClientesPage = lazy(() => import("./pages/admin/AdminClientesPage"));
+const AdminBitacoraPage = lazy(() => import("./pages/admin/AdminBitacoraPage"));
 const ClientePerfilPage = lazy(() => import("./pages/ClientePerfilPage"));
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
@@ -45,6 +46,7 @@ function App() {
           <Route path="/admin/inventarios" element={<AdminInventariosPage />} />
           <Route path="/admin/productos" element={<AdminProductosPage />} />
           <Route path="/admin/clientes" element={<AdminClientesPage />} />
+          <Route path="/admin/bitacora" element={<AdminBitacoraPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

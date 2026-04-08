@@ -26,5 +26,6 @@ export const adminSections = [
   { id: "users", label: "Usuarios", icon: "users", path: "/admin/usuarios", requiredPermission: "usuarios.ver" },
   { id: "inventory", label: "Inventario", icon: "inventory", path: "/admin/inventarios", requiredPermission: "inventario.ver" },
   { id: "customers", label: "Clientes", icon: "customers", path: "/admin/clientes", requiredPermission: "clientes.ver" },
+  { id: "bitacora", label: "Bitácora", icon: "reports", path: "/admin/bitacora", requiredPermission: "usuarios.gestionar" },
   { id: "roles-permisos", label: "Roles y permisos", icon: "settings", path: "/admin/roles-permisos", requiredPermission: "usuarios.gestionar" },
 ];

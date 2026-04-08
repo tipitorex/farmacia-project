@@ -73,6 +73,10 @@ Crear superusuario:
 docker compose exec backend python manage.py createsuperuser
 ```
 
+Crear productos
+```bash
+docker compose exec backend python manage.py seed_productos
+```
 Sembrar roles y permisos RBAC:
 
 ```bash

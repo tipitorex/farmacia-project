@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
@@ -26,8 +27,10 @@ from .serializers import (
     RolCreateUpdateSerializer,
     RolSerializer,
     UserSerializer,
+    BitacoraSistemaSerializer,
 )
 from .audit import log_auth_event
+from .models import BitacoraSistema
 from .rbac import (
     ROLES_PROTEGIDOS,
     ROLE_ADMIN,
@@ -56,6 +59,12 @@ class AdminUsersPagination(PageNumberPagination):
     page_size = 8
     page_size_query_param = "page_size"
     max_page_size = 50
+
+
+class AdminBitacoraPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 def ensure_rbac_seeded_and_user_role(user=None):
@@ -172,7 +181,7 @@ def register(request):
         fail_silently=True,
     )
 
-    log_auth_event(request, "register", outcome="success", email=user.email)
+    log_auth_event(request, "register", outcome="success", user_id=user.id, email=user.email)
 
     return Response(
         {
@@ -382,6 +391,18 @@ def admin_users_list(request):
     serializer = AdminUserCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     created_user = serializer.save()
+    
+    from .audit import log_system_event
+    log_system_event(
+        request=request,
+        accion="CREATE",
+        modulo="usuarios",
+        resultado="SUCCESS",
+        mensaje=f"Usuario creado: {created_user.email} con rol {obtener_rol_usuario(created_user)}",
+        entidad="User",
+        entidad_id=str(created_user.id),
+    )
+    
     return Response(AdminUserSerializer(created_user).data, status=status.HTTP_201_CREATED)
 
 
@@ -416,6 +437,17 @@ def admin_user_update(request, user_id):
             target_user.is_active = False
             target_user.save(update_fields=["is_active"])
 
+        from .audit import log_system_event
+        log_system_event(
+            request=request,
+            accion="DELETE",
+            modulo="usuarios",
+            resultado="SUCCESS",
+            mensaje=f"Usuario desactivado: {target_user.email}",
+            entidad="User",
+            entidad_id=str(target_user.id),
+        )
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     serializer = AdminUserUpdateSerializer(
@@ -426,6 +458,29 @@ def admin_user_update(request, user_id):
     )
     serializer.is_valid(raise_exception=True)
     updated_user = serializer.save()
+
+    from .audit import log_system_event
+    cambios = []
+    if "first_name" in request.data:
+        cambios.append(f"nombre={request.data.get('first_name')}")
+    if "last_name" in request.data:
+        cambios.append(f"apellido={request.data.get('last_name')}")
+    if "email" in request.data:
+        cambios.append(f"email={request.data.get('email')}")
+    if "role" in request.data:
+        cambios.append(f"rol={request.data.get('role')}")
+    if "is_active" in request.data:
+        cambios.append(f"activo={request.data.get('is_active')}")
+    
+    log_system_event(
+        request=request,
+        accion="UPDATE",
+        modulo="usuarios",
+        resultado="SUCCESS",
+        mensaje=f"Usuario actualizado: {updated_user.email} - Cambios: {', '.join(cambios) if cambios else 'N/A'}",
+        entidad="User",
+        entidad_id=str(updated_user.id),
+    )
 
     return Response(AdminUserSerializer(updated_user).data)
 
@@ -457,6 +512,17 @@ def admin_roles_list(request):
         role_group = crear_rol(role_name, role_permissions)
     except ValueError as ex:
         return Response({"detail": str(ex)}, status=status.HTTP_400_BAD_REQUEST)
+
+    from .audit import log_system_event
+    log_system_event(
+        request=request,
+        accion="CREATE",
+        modulo="roles",
+        resultado="SUCCESS",
+        mensaje=f"Rol creado: {role_name} con {len(role_permissions)} permisos",
+        entidad="Group",
+        entidad_id=str(role_group.id),
+    )
 
     return Response(RolSerializer(role_group).data, status=status.HTTP_201_CREATED)
 
@@ -490,7 +556,20 @@ def admin_role_detail(request, role_name):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        role_id = role_group.id
         role_group.delete()
+        
+        from .audit import log_system_event
+        log_system_event(
+            request=request,
+            accion="DELETE",
+            modulo="roles",
+            resultado="SUCCESS",
+            mensaje=f"Rol eliminado: {normalized_role_name}",
+            entidad="Group",
+            entidad_id=str(role_id),
+        )
+        
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     serializer = RolCreateUpdateSerializer(data={"nombre": role_group.name, "permisos": request.data.get("permisos", [])})
@@ -501,6 +580,17 @@ def admin_role_detail(request, role_name):
         actualizar_permisos_rol(role_group, role_permissions)
     except ValueError as ex:
         return Response({"detail": str(ex)}, status=status.HTTP_400_BAD_REQUEST)
+
+    from .audit import log_system_event
+    log_system_event(
+        request=request,
+        accion="UPDATE",
+        modulo="roles",
+        resultado="SUCCESS",
+        mensaje=f"Permisos actualizados para rol: {role_group.name} - {len(role_permissions)} permisos asignados",
+        entidad="Group",
+        entidad_id=str(role_group.id),
+    )
 
     return Response({"nombre": role_group.name, "permisos": obtener_permisos_rol(role_group.name)})
 
@@ -518,6 +608,51 @@ def admin_permisos_catalogo(request):
 
     serializer = PermisoCatalogoSerializer(obtener_catalogo_permisos(), many=True)
     return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_bitacora_list(request):
+    permission_denied = require_permission_response(
+        request.user,
+        "usuarios.gestionar",
+        "No tienes permisos para ver la bitacora del sistema.",
+    )
+    if permission_denied:
+        return permission_denied
+
+    queryset = BitacoraSistema.objects.select_related("usuario").exclude(accion__iexact="REFRESH")
+
+    accion = request.query_params.get("accion", "").strip()
+    modulo = request.query_params.get("modulo", "").strip()
+    resultado = request.query_params.get("resultado", "").strip()
+    usuario_id = request.query_params.get("usuario_id", "").strip()
+    fecha_desde = request.query_params.get("fecha_desde", "").strip()
+    fecha_hasta = request.query_params.get("fecha_hasta", "").strip()
+
+    if accion:
+        queryset = queryset.filter(accion__iexact=accion)
+    if modulo:
+        queryset = queryset.filter(modulo__iexact=modulo)
+    if resultado:
+        queryset = queryset.filter(resultado__iexact=resultado)
+    if usuario_id.isdigit():
+        queryset = queryset.filter(usuario_id=int(usuario_id))
+
+    if fecha_desde:
+        parsed = parse_datetime(fecha_desde)
+        if parsed:
+            queryset = queryset.filter(fecha_hora__gte=parsed)
+
+    if fecha_hasta:
+        parsed = parse_datetime(fecha_hasta)
+        if parsed:
+            queryset = queryset.filter(fecha_hora__lte=parsed)
+
+    paginator = AdminBitacoraPagination()
+    paged_events = paginator.paginate_queryset(queryset, request)
+    serializer = BitacoraSistemaSerializer(paged_events, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(["POST"])

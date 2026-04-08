@@ -16,6 +16,7 @@ from .rbac import (
     obtener_rol_usuario,
     puede_acceder_backoffice,
 )
+from .models import BitacoraSistema
 
 
 def _generate_unique_username(email):
@@ -296,3 +297,37 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         validate_password(attrs["password"])
         return attrs
+
+
+class BitacoraSistemaSerializer(serializers.ModelSerializer):
+    usuario_email = serializers.EmailField(source="usuario.email", read_only=True, allow_null=True)
+    usuario_nombre = serializers.CharField(source="usuario.first_name", read_only=True, allow_null=True)
+    usuario_apellido = serializers.CharField(source="usuario.last_name", read_only=True, allow_null=True)
+    usuario_rol = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BitacoraSistema
+        fields = (
+            "id",
+            "fecha_hora",
+            "usuario",
+            "usuario_email",
+            "usuario_nombre",
+            "usuario_apellido",
+            "usuario_rol",
+            "accion",
+            "modulo",
+            "entidad",
+            "entidad_id",
+            "resultado",
+            "mensaje",
+            "ip_origen",
+            "navegador",
+            "ruta",
+            "metodo_http",
+        )
+
+    def get_usuario_rol(self, obj):
+        if not obj.usuario:
+            return None
+        return obtener_rol_usuario(obj.usuario)

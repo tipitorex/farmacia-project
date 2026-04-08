@@ -1,10 +1,13 @@
 ﻿from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.db.models import F, Sum
 
 from core.rbac import tiene_permiso, ROLE_FARMACEUTICO
+from core.audit import log_system_event
 from .models import (
     Categoria,
     Subcategoria,
@@ -40,9 +43,42 @@ class CategoriaViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(estado=estado.lower() == "true")
         return queryset
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="CREATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Categoría creada: {instance.nombre}",
+            entidad="Categoria",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="UPDATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Categoría actualizada: {instance.nombre}",
+            entidad="Categoria",
+            entidad_id=str(instance.id),
+        )
+
     def perform_destroy(self, instance):
         instance.estado = False
         instance.save()
+        log_system_event(
+            request=self.request,
+            accion="DELETE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Categoría desactivada: {instance.nombre}",
+            entidad="Categoria",
+            entidad_id=str(instance.id),
+        )
 
 
 class SubcategoriaViewSet(viewsets.ModelViewSet):
@@ -59,6 +95,42 @@ class SubcategoriaViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(categoria_id=categoria_id)
         return queryset
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="CREATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Subcategoría creada: {instance.nombre}",
+            entidad="Subcategoria",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="UPDATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Subcategoría actualizada: {instance.nombre}",
+            entidad="Subcategoria",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_destroy(self, serializer):
+        log_system_event(
+            request=self.request,
+            accion="DELETE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Subcategoría eliminada: {self.get_object().nombre}",
+            entidad="Subcategoria",
+            entidad_id=str(self.get_object().id),
+        )
+        self.get_object().delete()
+
 
 class LaboratorioViewSet(viewsets.ModelViewSet):
     queryset = Laboratorio.objects.all()
@@ -68,11 +140,52 @@ class LaboratorioViewSet(viewsets.ModelViewSet):
     search_fields = ["nombre", "pais", "contacto_representante"]
     ordering_fields = ["nombre", "created_at"]
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="CREATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Laboratorio creado: {instance.nombre}",
+            entidad="Laboratorio",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="UPDATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Laboratorio actualizado: {instance.nombre}",
+            entidad="Laboratorio",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_destroy(self, instance):
+        log_system_event(
+            request=self.request,
+            accion="DELETE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Laboratorio eliminado: {instance.nombre}",
+            entidad="Laboratorio",
+            entidad_id=str(instance.id),
+        )
+        instance.delete()
+
+
+class ProductoPagination(PageNumberPagination):
+    page_size = 10
+
 
 class ProductoViewSet(viewsets.ModelViewSet):
     queryset = Producto.objects.all()
     serializer_class = ProductoSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = ProductoPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["sku", "nombre_comercial", "nombre_generico"]
     ordering_fields = ["sku", "nombre_comercial", "precio_venta", "created_at"]
@@ -83,6 +196,10 @@ class ProductoViewSet(viewsets.ModelViewSet):
         categoria = self.request.query_params.get("categoria")
         if categoria:
             queryset = queryset.filter(categoria_id=categoria)
+
+        subcategoria = self.request.query_params.get("subcategoria")
+        if subcategoria:
+            queryset = queryset.filter(subcategoria_id=subcategoria)
 
         laboratorio = self.request.query_params.get("laboratorio")
         if laboratorio:
@@ -104,7 +221,33 @@ class ProductoViewSet(viewsets.ModelViewSet):
         if precio_max:
             queryset = queryset.filter(precio_venta__lte=precio_max)
 
+        stock_estado = self.request.query_params.get("stock_estado")
+        if stock_estado == "sin_stock":
+            queryset = queryset.filter(inventario__stock_actual__lte=0)
+        elif stock_estado == "stock_bajo":
+            queryset = queryset.filter(
+                inventario__stock_actual__gt=0,
+                inventario__stock_actual__lte=F("stock_minimo"),
+            )
+        elif stock_estado == "disponible":
+            queryset = queryset.filter(inventario__stock_actual__gt=F("stock_minimo"))
+
         return queryset
+
+    @action(detail=False, methods=["get"])
+    def resumen_stock(self, request):
+        qs = Producto.objects.select_related("inventario").filter(estado=True)
+        agg = qs.aggregate(stock_total=Sum("inventario__stock_actual"))
+        return Response({
+            "total_productos": qs.count(),
+            "sin_stock": qs.filter(inventario__stock_actual__lte=0).count(),
+            "stock_bajo": qs.filter(
+                inventario__stock_actual__gt=0,
+                inventario__stock_actual__lte=F("stock_minimo"),
+            ).count(),
+            "disponible": qs.filter(inventario__stock_actual__gt=F("stock_minimo")).count(),
+            "stock_total_unidades": int(agg["stock_total"] or 0),
+        })
 
     @action(detail=True, methods=["get"])
     def inventario(self, request, pk=None):
@@ -112,6 +255,42 @@ class ProductoViewSet(viewsets.ModelViewSet):
         inventario = get_object_or_404(Inventario, producto=producto)
         serializer = InventarioSerializer(inventario)
         return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="CREATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Producto creado: {instance.nombre_comercial} (SKU: {instance.sku})",
+            entidad="Producto",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="UPDATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Producto actualizado: {instance.nombre_comercial} (SKU: {instance.sku})",
+            entidad="Producto",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_destroy(self, instance):
+        log_system_event(
+            request=self.request,
+            accion="DELETE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Producto eliminado: {instance.nombre_comercial} (SKU: {instance.sku})",
+            entidad="Producto",
+            entidad_id=str(instance.id),
+        )
+        instance.delete()
 
     @action(detail=True, methods=["post"])
     def ajustar_stock(self, request, pk=None):
@@ -135,6 +314,16 @@ class ProductoViewSet(viewsets.ModelViewSet):
                 usuario=request.user,
             )
 
+            log_system_event(
+                request=request,
+                accion="AJUSTE_STOCK",
+                modulo="inventarios",
+                resultado="SUCCESS",
+                mensaje=f"Stock ajustado - SKU: {producto.sku} | Tipo: {tipo_movimiento} | Cantidad: {cantidad} | Motivo: {motivo}",
+                entidad="Producto",
+                entidad_id=str(producto.id),
+            )
+
             inventario = Inventario.objects.get(producto=producto)
             return Response(
                 {
@@ -145,8 +334,26 @@ class ProductoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
         except ValueError as e:
+            log_system_event(
+                request=request,
+                accion="AJUSTE_STOCK",
+                modulo="inventarios",
+                resultado="FAILURE",
+                mensaje=f"Error al ajustar stock - SKU: {producto.sku} | Error: {str(e)}",
+                entidad="Producto",
+                entidad_id=str(producto.id),
+            )
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            log_system_event(
+                request=request,
+                accion="AJUSTE_STOCK",
+                modulo="inventarios",
+                resultado="FAILURE",
+                mensaje=f"Error interno al ajustar stock - SKU: {producto.sku} | Error: {str(e)}",
+                entidad="Producto",
+                entidad_id=str(producto.id),
+            )
             return Response({"error": f"Error al ajustar stock: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=["get"])
@@ -199,7 +406,40 @@ class EntradaStockViewSet(viewsets.ModelViewSet):
         return super().get_queryset().select_related("producto", "usuario").order_by("-created_at")
 
     def perform_create(self, serializer):
-        serializer.save(usuario=self.request.user)
+        instance = serializer.save(usuario=self.request.user)
+        log_system_event(
+            request=self.request,
+            accion="ENTRADA_STOCK",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Entrada de stock registrada - SKU: {instance.producto.sku} | Cantidad: {instance.cantidad} | Motivo: {instance.motivo}",
+            entidad="EntradaStock",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_system_event(
+            request=self.request,
+            accion="UPDATE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Entrada de stock actualizada - SKU: {instance.producto.sku}",
+            entidad="EntradaStock",
+            entidad_id=str(instance.id),
+        )
+
+    def perform_destroy(self, instance):
+        log_system_event(
+            request=self.request,
+            accion="DELETE",
+            modulo="inventarios",
+            resultado="SUCCESS",
+            mensaje=f"Entrada de stock eliminada - SKU: {instance.producto.sku}",
+            entidad="EntradaStock",
+            entidad_id=str(instance.id),
+        )
+        instance.delete()
 
     def create(self, request, *args, **kwargs):
         if not (
@@ -207,6 +447,15 @@ class EntradaStockViewSet(viewsets.ModelViewSet):
             or request.user.groups.filter(name=ROLE_FARMACEUTICO).exists()
             or request.user.is_superuser
         ):
+            log_system_event(
+                request=request,
+                accion="ENTRADA_STOCK",
+                modulo="inventarios",
+                resultado="FAILURE",
+                mensaje="Intento de registro de entrada sin permisos",
+                entidad="EntradaStock",
+                entidad_id="",
+            )
             return Response(
                 {"detail": "No tienes permiso para registrar entradas de stock."},
                 status=status.HTTP_403_FORBIDDEN,

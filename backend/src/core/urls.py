@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    admin_bitacora_list,
     admin_permisos_catalogo,
     admin_role_detail,
     admin_roles_list,
@@ -32,4 +33,5 @@ urlpatterns = [
     path("admin/roles/", admin_roles_list, name="admin-roles-list"),
     path("admin/roles/<str:role_name>/", admin_role_detail, name="admin-role-detail"),
     path("admin/permisos/", admin_permisos_catalogo, name="admin-permisos-catalogo"),
+    path("admin/bitacora/", admin_bitacora_list, name="admin-bitacora-list"),
 ]

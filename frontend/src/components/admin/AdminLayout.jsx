@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { adminSections } from "../../data/adminData";
 import {
@@ -19,7 +19,12 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function AdminLayout({ activeSection, setActiveSection, currentUser, onLogout, children }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showUsersSection, setShowUsersSection] = useState(true);
+  const [showUsersSection, setShowUsersSection] = useState(false);
+  const [showInventorySection, setShowInventorySection] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("admin-sidebar-collapsed") === "true";
+  });
   const userMenuRef = useRef(null);
   const { hasPermission } = useAuth();
   const location = useLocation();
@@ -40,6 +45,7 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
   );
 
   const userManagementSectionIds = ["users", "roles-permisos"];
+  const inventorySectionId = "inventory";
 
   const activeSectionByPath = useMemo(() => {
     return adminSections.find((section) => section.path === location.pathname)?.id || null;
@@ -63,8 +69,13 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
     [visibleSections]
   );
 
+  const inventorySection = useMemo(
+    () => visibleSections.find((section) => section.id === inventorySectionId) || null,
+    [visibleSections]
+  );
+
   const regularSections = useMemo(
-    () => visibleSections.filter((section) => !userManagementSectionIds.includes(section.id)),
+    () => visibleSections.filter((section) => !userManagementSectionIds.includes(section.id) && section.id !== inventorySectionId),
     [visibleSections]
   );
 
@@ -79,6 +90,29 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
   );
 
   const isUsersSectionActive = userManagementSections.some((section) => section.id === resolvedActiveSection);
+  const inventoryView = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("view") || "entradas";
+  }, [location.search]);
+  const isInventorySectionActive = resolvedActiveSection === inventorySectionId;
+
+  useEffect(() => {
+    if (isUsersSectionActive) {
+      setShowUsersSection(true);
+    }
+  }, [isUsersSectionActive]);
+
+  useEffect(() => {
+    if (isInventorySectionActive) {
+      setShowInventorySection(true);
+    }
+  }, [isInventorySectionActive]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("admin-sidebar-collapsed", String(isSidebarCollapsed));
+    }
+  }, [isSidebarCollapsed]);
 
   const fullName = useMemo(() => {
     return [currentUser?.first_name, currentUser?.last_name].filter(Boolean).join(" ").trim();
@@ -114,13 +148,40 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
     settings: CogIcon,
   };
 
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => !prev);
+  };
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-800">
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-5 lg:px-6">
-        <aside className="rounded-[28px] border border-slate-200 bg-white/97 p-4 shadow-md lg:p-5">
+      <div
+        className={`mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 gap-4 px-4 py-4 transition-[grid-template-columns] duration-300 lg:gap-5 lg:px-6 ${
+          isSidebarCollapsed ? "lg:grid-cols-[0_minmax(0,1fr)]" : "lg:grid-cols-[250px_minmax(0,1fr)]"
+        }`}
+      >
+        <aside
+          className={`rounded-[28px] border border-slate-200 bg-white/97 p-4 shadow-md transition-all duration-300 lg:w-[250px] lg:p-5 ${
+            isSidebarCollapsed
+              ? "lg:pointer-events-none lg:-translate-x-[calc(100%+1.25rem)] lg:opacity-0"
+              : "lg:translate-x-0 lg:opacity-100"
+          }`}
+        >
           <div className="mb-5 rounded-2xl bg-gradient-to-r from-teal-700 to-cyan-700 p-4 text-white">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-teal-100">Panel administrativo</p>
-            <h1 className="mt-1 text-lg font-black">Farmacia SaludPlus</h1>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-teal-100">Panel administrativo</p>
+                <h1 className="mt-1 text-lg font-black">Farmacia SaludPlus</h1>
+              </div>
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="hidden h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20 lg:inline-flex"
+                aria-label="Ocultar panel administrativo"
+                title="Ocultar panel"
+              >
+                <ChevronDownIcon className="h-4 w-4 rotate-90" />
+              </button>
+            </div>
           </div>
 
           <nav className="space-y-1.5">
@@ -189,6 +250,53 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
               </div>
             ) : null}
 
+            {inventorySection ? (
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowInventorySection((prev) => !prev)}
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    isInventorySectionActive
+                      ? "border-teal-600 bg-teal-600 text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${isInventorySectionActive ? "bg-white/20" : "bg-slate-100 text-slate-600"}`}>
+                    <PackageIcon className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 truncate">Inventario</span>
+                  <ChevronDownIcon className={`h-4 w-4 transition ${showInventorySection ? "rotate-180" : ""}`} />
+                </button>
+
+                {showInventorySection ? (
+                  <div className="space-y-1 pl-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate("/admin/inventarios?view=entradas")}
+                      className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                        isInventorySectionActive && inventoryView === "entradas"
+                          ? "border-teal-600 bg-teal-50 text-teal-700"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="truncate">Entrada de inventario</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/admin/inventarios?view=stock")}
+                      className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                        isInventorySectionActive && inventoryView === "stock"
+                          ? "border-teal-600 bg-teal-50 text-teal-700"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="truncate">Inventario (stock)</span>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {otherRegularSections.map((section) => {
               const Icon = iconMap[section.icon] || ShieldIcon;
               const isActive = resolvedActiveSection === section.id;
@@ -214,12 +322,24 @@ export default function AdminLayout({ activeSection, setActiveSection, currentUs
           </nav>
         </aside>
 
-        <section className="space-y-4">
+        <section className="min-w-0 space-y-4">
           <header className="rounded-[28px] border border-slate-200 bg-white/97 p-4 shadow-md sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 lg:inline-flex"
+                  aria-label={isSidebarCollapsed ? "Mostrar panel administrativo" : "Ocultar panel administrativo"}
+                  title={isSidebarCollapsed ? "Mostrar panel" : "Ocultar panel"}
+                >
+                  <ChevronDownIcon className={`h-5 w-5 transition-transform ${isSidebarCollapsed ? "-rotate-90" : "rotate-90"}`} />
+                </button>
+
+                <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Backoffice</p>
                 <h2 className="text-xl font-black text-slate-900">Gestion operativa</h2>
+                </div>
               </div>
               <div className="relative" ref={userMenuRef}>
                 <button

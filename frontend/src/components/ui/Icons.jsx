@@ -234,3 +234,24 @@ export function BackIcon({ className }) {
     </svg>
   );
 }
+
+export function CalendarIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+    </BaseIcon>
+  );
+}
+
+export function FilterIcon({ className }) {
+  return (
+    <BaseIcon className={className}>
+      <path d="M4 7h16" />
+      <path d="M6 11h12" />
+      <path d="M8 15h8" />
+    </BaseIcon>
+  );
+}

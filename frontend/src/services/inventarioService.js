@@ -5,6 +5,17 @@ const buildQuery = (params) => {
   return '?' + new URLSearchParams(params).toString();
 };
 
+const buildBodyAndHeaders = (data) => {
+  if (data instanceof FormData) {
+    return { body: data };
+  }
+
+  return {
+    body: JSON.stringify(data),
+    headers: { 'Content-Type': 'application/json' },
+  };
+};
+
 export const categoriasService = {
   listar: (params) => requestJsonWithAuthRetry(`/api/inventarios/categorias/${buildQuery(params)}`),
   crear: (data) => requestJsonWithAuthRetry('/api/inventarios/categorias/', {
@@ -61,13 +72,11 @@ export const productosService = {
   obtener: (id) => requestJsonWithAuthRetry(`/api/inventarios/productos/${id}/`),
   crear: (data) => requestJsonWithAuthRetry('/api/inventarios/productos/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    ...buildBodyAndHeaders(data),
   }),
   actualizar: (id, data) => requestJsonWithAuthRetry(`/api/inventarios/productos/${id}/`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    ...buildBodyAndHeaders(data),
   }),
   eliminar: (id) => requestJsonWithAuthRetry(`/api/inventarios/productos/${id}/`, {
     method: 'DELETE',
@@ -80,14 +89,15 @@ export const productosService = {
   }),
   stockBajo: () => requestJsonWithAuthRetry('/api/inventarios/productos/stock_bajo/'),
   sinStock: () => requestJsonWithAuthRetry('/api/inventarios/productos/sin_stock/'),
+  resumenStock: () => requestJsonWithAuthRetry('/api/inventarios/productos/resumen_stock/'),
 };
 
 export const movimientosService = {
   listar: (params) => requestJsonWithAuthRetry(`/api/inventarios/movimientos/${buildQuery(params)}`),
 };
 
-export async function obtenerProductos() {
-  return productosService.listar();
+export async function obtenerProductos(params) {
+  return productosService.listar(params);
 }
 
 export async function crearEntradaStock(data) {

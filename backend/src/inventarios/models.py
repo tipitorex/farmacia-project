@@ -82,6 +82,7 @@ class Producto(models.Model):
     nombre_comercial = models.CharField(max_length=200)
     nombre_generico = models.CharField(max_length=200, blank=True)
     descripcion = models.TextField(blank=True)
+    imagen = models.ImageField(upload_to="productos/", null=True, blank=True)
 
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, related_name="productos")
     subcategoria = models.ForeignKey(
