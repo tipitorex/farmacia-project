@@ -26,6 +26,12 @@ PERMISOS_CATALOGO = {
     "ventas.gestionar": "Puede gestionar ventas",
     "clientes.ver": "Puede ver clientes",
     "clientes.gestionar": "Puede gestionar clientes",
+    "categorias.ver": "Puede ver categorias",
+    "categorias.gestionar": "Puede gestionar categorias",
+    "subcategorias.ver": "Puede ver subcategorias",
+    "subcategorias.gestionar": "Puede gestionar subcategorias",
+    "laboratorios.ver": "Puede ver laboratorios",
+    "laboratorios.gestionar": "Puede gestionar laboratorios",
 }
 
 PERMISOS_ROL = {
@@ -41,6 +47,12 @@ PERMISOS_ROL = {
         "ventas.ver",
         "ventas.gestionar",
         "clientes.ver",
+        "categorias.ver",
+        "categorias.gestionar",
+        "subcategorias.ver",
+        "subcategorias.gestionar",
+        "laboratorios.ver",
+        "laboratorios.gestionar",
     },
     ROLE_CAJERO: {
         "productos.ver",
@@ -50,6 +62,9 @@ PERMISOS_ROL = {
         "ventas.gestionar",
         "clientes.ver",
         "clientes.gestionar",
+        "categorias.ver",
+        "subcategorias.ver",   
+        "laboratorios.ver",     
     },
     ROLE_CLIENTE: set(),
 }
@@ -222,6 +237,8 @@ def puede_acceder_backoffice(user):
             "pedidos.ver",
             "ventas.ver",
             "clientes.ver",
+            "categorias.ver",
+            "laboratorios.ver"
         ]
     )
 

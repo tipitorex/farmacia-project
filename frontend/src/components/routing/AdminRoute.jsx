@@ -8,6 +8,9 @@ export default function AdminRoute() {
   const hasBackofficeAccess =
     hasPermission("usuarios.ver") ||
     hasPermission("productos.ver") ||
+    hasPermission("laboratorios.ver") ||
+    hasPermission("categorias.ver") ||
+    hasPermission("subcategorias.ver") ||
     hasPermission("inventario.ver") ||
     hasPermission("pedidos.ver") ||
     hasPermission("ventas.ver") ||
